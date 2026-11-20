@@ -52,8 +52,11 @@ export const INJECTION_PHRASES: RegExp[] = [
 /** The folders where agent worms store their payload, next to the agent configuration. */
 export const PAYLOAD_FOLDER = /^(?:\.claude|\.cursor|\.gemini|\.vscode)\//u;
 
-/** The setup scripts that worm hooks start, at the root or in scripts/. */
-export const SETUP_SCRIPT = /^(?:(?:scripts|\.github)\/)?(?:setup|init)\.(?:c|m)?js$/u;
+/**
+ * The setup scripts that worm hooks start, at the root or in scripts/. `init.ps1` is the Windows twin of Miasma's
+ * `.github/init.js`; it is the only PowerShell name a report has shown, so no other `.ps1` is read as a payload.
+ */
+export const SETUP_SCRIPT = /^(?:(?:scripts|\.github)\/)?(?:(?:setup|init)\.(?:c|m)?js|init\.ps1)$/u;
 
 /** The commands that start a worm payload: a setup or init script, or a script downloaded and piped into a shell. */
 export const PAYLOAD_COMMANDS: Signature<RegExp>[] = [
