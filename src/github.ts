@@ -9,7 +9,9 @@ const NO_TOKEN_HINT = " Without a token GitHub allows 60 requests per hour; with
 const MILLISECONDS_PER_SECOND = 1000;
 /** The default longest wait, in seconds, for the rate limit to reset before giving up. */
 export const DEFAULT_MAX_WAIT_SECONDS = 300;
-const MAX_ATTEMPTS = 3;
+const MAX_ATTEMPTS = 4;
+/** The extra wait after the announced reset, because the clocks of GitHub and of the computer differ a little. */
+const CLOCK_MARGIN_MILLISECONDS = 1000;
 
 /** The error thrown when the GitHub API refuses a request or cannot be reached. */
 export class GitHubError extends Error {
@@ -74,7 +76,7 @@ export function readWaitMilliseconds(response: Response, now: number): number | 
   if (response.headers.get("x-ratelimit-remaining") !== "0" || reset === null) {
     return undefined;
   }
-  return Math.max(0, Number(reset) * MILLISECONDS_PER_SECOND - now);
+  return Math.max(0, Number(reset) * MILLISECONDS_PER_SECOND - now) + CLOCK_MARGIN_MILLISECONDS;
 }
 
 /** Waits for the given number of milliseconds. */
@@ -116,7 +118,7 @@ export function createGitHubClient(options: ScanOptions): GitHubClient {
       options.onWait?.(Math.ceil(waitMilliseconds / MILLISECONDS_PER_SECOND));
       await wait(waitMilliseconds);
     }
-    throw new GitHubError(`GitHub kept refusing ${path} after waiting for the rate limit.${LIMIT_HINT}`);
+    throw new GitHubError(`GitHub kept refusing ${path} after waiting three times for the rate limit.${LIMIT_HINT}`);
   }
 
   return { getJson };

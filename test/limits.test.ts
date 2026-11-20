@@ -28,8 +28,8 @@ async function skipWait(): Promise<void> {
 function readsTheWaitTime(): void {
   const now = 1_000_000;
   expect(readWaitMilliseconds(new Response("{}", { status: 429, headers: { "retry-after": "7" } }), now)).toBe(7000);
-  expect(readWaitMilliseconds(new Response("{}", { status: 403, headers: RESET_IN_TEN_SECONDS }), now)).toBe(10_000);
-  expect(readWaitMilliseconds(new Response("{}", { status: 403, headers: { ...RESET_IN_TEN_SECONDS, "x-ratelimit-reset": "1" } }), now)).toBe(0);
+  expect(readWaitMilliseconds(new Response("{}", { status: 403, headers: RESET_IN_TEN_SECONDS }), now)).toBe(11_000);
+  expect(readWaitMilliseconds(new Response("{}", { status: 403, headers: { ...RESET_IN_TEN_SECONDS, "x-ratelimit-reset": "1" } }), now)).toBe(1000);
   expect(readWaitMilliseconds(new Response("{}", { status: 403 }), now)).toBeUndefined();
   expect(readWaitMilliseconds(new Response("{}", { status: 403, headers: { "x-ratelimit-remaining": "0" } }), now)).toBeUndefined();
   expect(readWaitMilliseconds(new Response("{}", { status: 500 }), now)).toBeUndefined();
@@ -65,11 +65,11 @@ async function stopsWhenTheResetIsTooFar(): Promise<void> {
   vi.useRealTimers();
 }
 
-/** Checks that the client gives up after waiting twice. */
-async function givesUpAfterTwoWaits(): Promise<void> {
+/** Checks that the client gives up after waiting three times. */
+async function givesUpAfterThreeWaits(): Promise<void> {
   const fetchFunction = createFakeFetch({ "/x": { status: 429, headers: { "retry-after": "1" } } });
   const client = createGitHubClient({ fetch: fetchFunction, sleep: skipWait });
-  await expect(client.getJson("/x")).rejects.toThrow("GitHub kept refusing /x after waiting for the rate limit.");
+  await expect(client.getJson("/x")).rejects.toThrow("GitHub kept refusing /x after waiting three times for the rate limit.");
 }
 
 /** Checks that the real wait function waits before the retry. */
@@ -105,7 +105,7 @@ function describeLimits(): void {
   it("reads the wait time", readsTheWaitTime);
   it("waits then retries", waitsThenRetries);
   it("stops when the reset is too far", stopsWhenTheResetIsTooFar);
-  it("gives up after two waits", givesUpAfterTwoWaits);
+  it("gives up after three waits", givesUpAfterThreeWaits);
   it("waits with the real timer", waitsWithTheRealTimer);
   it("decodes base64 text", decodesBase64Text);
   it("reports progress", reportsProgress);

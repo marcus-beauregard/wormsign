@@ -1,5 +1,5 @@
 {
-  "date": "2026-11-20T00:53:43.718Z",
+  "date": "2026-11-20T01:03:15.289Z",
   "repositoriesPerOrganization": 20,
   "branchesPerRepository": 3,
   "results": [
@@ -7,7 +7,7 @@
       "organization": "anthropics",
       "repositories": 20,
       "wormSigns": [],
-      "notes": 4
+      "notes": 5
     },
     {
       "organization": "modelcontextprotocol",
@@ -19,7 +19,31 @@
       "organization": "openai",
       "repositories": 20,
       "wormSigns": [],
-      "notes": 11
+      "notes": 6
+    },
+    {
+      "organization": "astral-sh",
+      "repositories": 20,
+      "wormSigns": [],
+      "notes": 3
+    },
+    {
+      "organization": "oven-sh",
+      "repositories": 18,
+      "wormSigns": [],
+      "notes": 1
+    },
+    {
+      "organization": "denoland",
+      "repositories": 20,
+      "wormSigns": [],
+      "notes": 2
+    },
+    {
+      "organization": "vitejs",
+      "repositories": 20,
+      "wormSigns": [],
+      "notes": 0
     }
   ]
 }

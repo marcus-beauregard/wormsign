@@ -1,6 +1,6 @@
 // This script measures false positives: it scans the most recently pushed repositories of well-known healthy
 // organizations and writes docs/benchmark.json. Usage: GITHUB_TOKEN=$(gh auth token) node scripts/benchmark.mjs
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { isWormSign, scan } from "../dist/index.js";
 
 const ORGANIZATIONS_FILE = new URL("./healthy-organizations.txt", import.meta.url);
@@ -63,10 +63,19 @@ async function scanOrganization(organization) {
   return { organization, repositories: repositories.length, wormSigns, notes };
 }
 
-/** Scans every organization of the list and writes the result file. */
+/** Returns the organization of a result. */
+function readOrganization(result) {
+  return result.organization;
+}
+
+/** Scans every organization of the list, skipping those already measured, and writes the result file. */
 async function runBenchmark() {
-  const results = [];
+  const results = existsSync(RESULT_FILE) ? JSON.parse(readFileSync(RESULT_FILE, "utf8")).results : [];
+  const done = new Set(results.map(readOrganization));
   for (const organization of readOrganizations()) {
+    if (done.has(organization)) {
+      continue;
+    }
     results.push(await scanOrganization(organization));
     const summary = { date: new Date().toISOString(), repositoriesPerOrganization: REPOSITORIES_PER_ORGANIZATION, branchesPerRepository: BRANCHES_PER_REPOSITORY, results };
     writeFileSync(RESULT_FILE, `${JSON.stringify(summary, null, 2)}\n`);
