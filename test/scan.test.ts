@@ -190,8 +190,20 @@ async function capsBranchesAndHandlesMissingFiles(): Promise<void> {
   const answers = { "/repos/o/r/branches?per_page=1": body(branches), "/repos/o/r/contents/locked?ref=1": { status: 500 } };
   const client = createGitHubClient({ fetch: createFakeFetch(answers), apiUrl: "https://api.github.com" });
   expect(await listBranches(client, "o/r", 1)).toHaveLength(1);
+  const manyAnswers = {
+    "/repos/o/many/branches?per_page=2": { body: [{ name: "a", commit: { sha: "1" } }, { name: "b", commit: { sha: "2" } }] },
+    "/repos/o/many/branches/main": { body: { name: "main", commit: { sha: "3" } } },
+  };
+  const manyBranches = createGitHubClient({ fetch: createFakeFetch(manyAnswers) });
+  expect((await listBranches(manyBranches, "o/many", 2, "main")).map(readName)).toEqual(["main", "a"]);
+  expect((await listBranches(manyBranches, "o/many", 2, "a")).map(readName)).toEqual(["a", "b"]);
   expect(await getFileText(client, "o/r", "missing", "1")).toBeUndefined();
   await expect(getFileText(client, "o/r", "locked", "1")).rejects.toBeInstanceOf(GitHubError);
+}
+
+/** Returns the name of a branch. */
+function readName(branch: { name: string }): string {
+  return branch.name;
 }
 
 /** Groups the tests of the GitHub client. */

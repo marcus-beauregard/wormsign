@@ -142,11 +142,23 @@ export async function getRepository(client: GitHubClient, fullName: string): Pro
   return client.getJson<RepositoryInfo>(`/repos/${fullName}`);
 }
 
-/** Lists the branches of a repository, at most the given number. */
-export async function listBranches(client: GitHubClient, fullName: string, maxBranches: number): Promise<BranchInfo[]> {
+/** Lists the branches of a repository, at most the given number, and always includes the default branch. */
+export async function listBranches(client: GitHubClient, fullName: string, maxBranches: number, defaultBranch?: string): Promise<BranchInfo[]> {
   const pageSize = Math.min(maxBranches, PAGE_SIZE);
   const branches = await client.getJson<BranchInfo[]>(`/repos/${fullName}/branches?per_page=${pageSize}`);
-  return branches.slice(0, maxBranches);
+  const firstBranches = branches.slice(0, maxBranches);
+  const repositoryIsEmpty = firstBranches.length === 0;
+  const defaultBranchIsListed = defaultBranch === undefined || repositoryIsEmpty || firstBranches.some(hasName, defaultBranch);
+  if (defaultBranchIsListed) {
+    return firstBranches;
+  }
+  const defaultHead = await client.getJson<BranchInfo>(`/repos/${fullName}/branches/${encodeURIComponent(defaultBranch)}`);
+  return [defaultHead, ...firstBranches.slice(0, maxBranches - 1)];
+}
+
+/** Tells whether a branch has the name given as this. */
+function hasName(this: string, branch: BranchInfo): boolean {
+  return branch.name === this;
 }
 
 /** Reads the full file tree of a commit, without downloading any file. */

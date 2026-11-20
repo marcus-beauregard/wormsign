@@ -134,7 +134,7 @@ export async function scanRepository(client, repository, maxBranches) {
         const message = `${RULES.dropRepository.title}: description "${repository.description}".`;
         findings.push(createFinding(RULES.dropRepository, place, message));
     }
-    const branches = await listBranches(client, repository.full_name, maxBranches);
+    const branches = await listBranches(client, repository.full_name, maxBranches, repository.default_branch);
     const scannedCommits = new Set();
     for (const branch of branches) {
         if (scannedCommits.has(branch.commit.sha)) {

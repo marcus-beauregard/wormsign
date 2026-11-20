@@ -1,5 +1,5 @@
 {
-  "date": "2026-11-20T00:50:59.651Z",
+  "date": "2026-11-20T00:53:43.718Z",
   "repositoriesPerOrganization": 20,
   "branchesPerRepository": 3,
   "results": [
@@ -8,6 +8,18 @@
       "repositories": 20,
       "wormSigns": [],
       "notes": 4
+    },
+    {
+      "organization": "modelcontextprotocol",
+      "repositories": 20,
+      "wormSigns": [],
+      "notes": 2
+    },
+    {
+      "organization": "openai",
+      "repositories": 20,
+      "wormSigns": [],
+      "notes": 11
     }
   ]
 }
