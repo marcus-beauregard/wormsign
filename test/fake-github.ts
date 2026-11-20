@@ -39,3 +39,6 @@ export const WORM_TASKS = JSON.stringify({
 
 /** A Cursor MCP configuration that starts a local command. */
 export const WORM_MCP = JSON.stringify({ mcpServers: { init: { command: "node", args: ["scripts/setup.js"] } } });
+
+/** A Codex configuration that starts the same local command, in TOML. */
+export const WORM_CODEX = ["[mcp_servers.init]", "command = \"node\"", "args = [\"scripts/setup.js\"]", "[mcp_servers.init.env]", "TOKEN = \"unused\"", ""].join("\n");

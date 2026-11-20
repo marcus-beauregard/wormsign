@@ -36,6 +36,8 @@ export const INSTRUCTION_FILES = new Set([
 export const HOOK_FILES = new Set([".claude/settings.json", ".claude/settings.local.json", ".gemini/settings.json", ".cursor/hooks.json"]);
 /** The files where agents and editors read MCP servers. */
 export const MCP_FILES = new Set([".mcp.json", ".cursor/mcp.json", ".vscode/mcp.json", ".roo/mcp.json", ".gemini/settings.json"]);
+/** The file where Codex CLI reads MCP servers, written in TOML rather than JSON. */
+export const MCP_TOML_FILES = new Set([".codex/config.toml"]);
 /** The file where VS Code and its forks read tasks. */
 export const TASKS_FILE = ".vscode/tasks.json";
 /** Tells whether a path is an instruction file, at the root or as a Cursor rule. */
@@ -115,6 +117,82 @@ export function findMcpCommands(configText) {
     }
     const servers = config.mcpServers ?? config.servers;
     return collectCommands(servers);
+}
+/** The shape of a TOML table header, such as [mcp_servers.local]. */
+const TOML_TABLE = /^\s*\[([^\]]+)\]\s*(?:#.*)?$/u;
+/** The shape of a TOML assignment whose value is written on the same line. */
+const TOML_COMMAND = /^\s*command\s*=\s*(.*)$/u;
+/** The shape of a Codex table that declares one MCP server, quoted name included. */
+const MCP_SERVER_TABLE = /^mcp_servers\.(?:[A-Za-z0-9_-]+|"[^"]*"|'[^']*')$/u;
+/** Returns the name inside a TOML table header, or undefined for any other line. */
+function readTableHeader(line) {
+    return TOML_TABLE.exec(line)?.[1]?.trim();
+}
+/** Tells whether a table header declares one MCP server: [mcp_servers.local], not [mcp_servers.local.env]. */
+function isMcpServerTable(header) {
+    return MCP_SERVER_TABLE.test(header);
+}
+/** Reads a one-line TOML string, undoing \" and \\ inside a basic string, or returns undefined when the value is not one. */
+function readTomlString(value) {
+    const delimiter = value.charAt(0);
+    const isBasicString = delimiter === "\"";
+    if (!isBasicString && delimiter !== "'") {
+        return undefined;
+    }
+    let result = "";
+    let index = 1;
+    while (index < value.length) {
+        const character = value.charAt(index);
+        if (isBasicString && character === "\\") {
+            const escaped = value.charAt(index + 1);
+            result += escaped === "\\" || escaped === "\"" ? escaped : `\\${escaped}`;
+            index += 2;
+            continue;
+        }
+        if (character === delimiter) {
+            return result;
+        }
+        result += character;
+        index += 1;
+    }
+    return undefined;
+}
+/** Returns the command of an MCP server table line, or undefined when the line holds no non-empty command string. */
+function readTomlCommand(line) {
+    const value = TOML_COMMAND.exec(line)?.[1];
+    if (value === undefined) {
+        return undefined;
+    }
+    const command = readTomlString(value.trim());
+    return command === "" ? undefined : command;
+}
+/**
+ * Returns the commands of the local MCP servers declared in a Codex TOML file.
+ * Only `command` keys written directly in a `[mcp_servers.<name>]` table count, so the
+ * same key inside a sub-table such as `[mcp_servers.<name>.env]` is not mistaken for one.
+ * A line that opens a table without closing it ends the current table, so a command below a
+ * broken header is not credited to the server above it.
+ * Inline tables (`name = { command = "..." }`) are not read: no worm sample uses them.
+ */
+export function findMcpTomlCommands(text) {
+    const commands = [];
+    let inServerTable = false;
+    for (const line of text.split(/\r?\n/u)) {
+        const header = readTableHeader(line);
+        if (header !== undefined) {
+            inServerTable = isMcpServerTable(header);
+            continue;
+        }
+        if (line.trimStart().startsWith("[")) {
+            inServerTable = false;
+            continue;
+        }
+        const command = inServerTable ? readTomlCommand(line) : undefined;
+        if (command !== undefined) {
+            commands.push(command);
+        }
+    }
+    return commands;
 }
 /** Tells whether a text contains invisible or text-direction characters. */
 export function hasInvisibleCharacters(text) {

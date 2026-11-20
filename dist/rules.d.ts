@@ -78,6 +78,8 @@ export declare const INSTRUCTION_FILES: Set<string>;
 export declare const HOOK_FILES: Set<string>;
 /** The files where agents and editors read MCP servers. */
 export declare const MCP_FILES: Set<string>;
+/** The file where Codex CLI reads MCP servers, written in TOML rather than JSON. */
+export declare const MCP_TOML_FILES: Set<string>;
 /** The file where VS Code and its forks read tasks. */
 export declare const TASKS_FILE = ".vscode/tasks.json";
 /** Tells whether a path is an instruction file, at the root or as a Cursor rule. */
@@ -97,6 +99,15 @@ export declare function findHookCommands(settingsText: string): HookCommands;
 export declare function findFolderOpenTasks(tasksText: string): string[];
 /** Returns the commands of the local MCP servers declared in a configuration file. */
 export declare function findMcpCommands(configText: string): string[];
+/**
+ * Returns the commands of the local MCP servers declared in a Codex TOML file.
+ * Only `command` keys written directly in a `[mcp_servers.<name>]` table count, so the
+ * same key inside a sub-table such as `[mcp_servers.<name>.env]` is not mistaken for one.
+ * A line that opens a table without closing it ends the current table, so a command below a
+ * broken header is not credited to the server above it.
+ * Inline tables (`name = { command = "..." }`) are not read: no worm sample uses them.
+ */
+export declare function findMcpTomlCommands(text: string): string[];
 /** Tells whether a text contains invisible or text-direction characters. */
 export declare function hasInvisibleCharacters(text: string): boolean;
 /** Returns the phrases of a text that tell an agent to skip confirmation or hide what it does. */
