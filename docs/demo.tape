@@ -8,7 +8,7 @@ Set Padding 18
 Set Theme "GitHub Dark"
 Set TypingSpeed 45ms
 Hide
-Type "export PATH=/private/tmp/claude-502/-Users-Mike-Documents-Github-perso-emploi/ac4b8479-4460-479a-8659-6b2991c00e05/scratchpad/bin:$PATH GITHUB_TOKEN=$(gh auth token) PS1='$ ' && clear"
+Type "alias wormsign='node dist/cli.js'; export GITHUB_TOKEN=$(gh auth token) PS1='$ ' && clear"
 Enter
 Show
 Type "wormsign ConcordiaDev/theme_saimaniq"
