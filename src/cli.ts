@@ -1,0 +1,130 @@
+#!/usr/bin/env node
+import { realpathSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { formatJson, formatSarif, formatText, scan } from "./index.js";
+import type { ScanOptions, ScanResult } from "./index.js";
+
+/** The version printed in reports, kept equal to the one in package.json. */
+export const VERSION = "0.1.0";
+
+/** The exit code when no finding was found. */
+export const EXIT_CLEAN = 0;
+/** The exit code when at least one finding was found. */
+export const EXIT_FINDINGS = 1;
+/** The exit code when the scan could not run. */
+export const EXIT_ERROR = 2;
+
+const USAGE = `Usage: wormsign <owner | owner/repo> [--json | --sarif] [--max-branches <n>]
+
+Scans GitHub repositories for agent worms (Miasma, Mini Shai-Hulud) through the API only:
+nothing is cloned, nothing is run. Set GITHUB_TOKEN (for example: GITHUB_TOKEN=$(gh auth token)).`;
+
+/** The options read from the command line. */
+export interface CommandLine {
+  target: string;
+  format: "text" | "json" | "sarif";
+  maxBranches?: number;
+}
+
+/** Reads the value of --max-branches and checks that it is a positive whole number. */
+function readMaxBranches(value: string | undefined): number {
+  const maxBranches = Number(value);
+  if (!Number.isInteger(maxBranches) || maxBranches < 1) {
+    throw new RangeError("--max-branches needs a whole number of at least 1.");
+  }
+  return maxBranches;
+}
+
+/** Reads the command line arguments, or throws a RangeError with the usage when they are wrong. */
+export function parseArguments(argumentsList: string[]): CommandLine {
+  const commandLine: CommandLine = { target: "", format: "text" };
+  for (let index = 0; index < argumentsList.length; index += 1) {
+    const argument = argumentsList[index];
+    if (argument === "--json" || argument === "--sarif") {
+      commandLine.format = argument === "--json" ? "json" : "sarif";
+    } else if (argument === "--max-branches") {
+      index += 1;
+      commandLine.maxBranches = readMaxBranches(argumentsList[index]);
+    } else if (commandLine.target === "" && argument !== undefined && !argument.startsWith("-")) {
+      commandLine.target = argument;
+    } else {
+      throw new RangeError(USAGE);
+    }
+  }
+  if (commandLine.target === "") {
+    throw new RangeError(USAGE);
+  }
+  return commandLine;
+}
+
+/** Writes the scan result in the format chosen on the command line. */
+export function formatResult(result: ScanResult, format: CommandLine["format"]): string {
+  if (format === "json") {
+    return formatJson(result.findings);
+  }
+  if (format === "sarif") {
+    return formatSarif(result.findings, VERSION);
+  }
+  return formatText(result.findings, result.scannedRepositories);
+}
+
+/** The streams the command writes to, replaceable in tests. */
+export interface Output {
+  write: (text: string) => void;
+  error: (text: string) => void;
+}
+
+/** Builds the scan options from the command line and the token found in the environment. */
+export function buildScanOptions(commandLine: CommandLine, environment: NodeJS.ProcessEnv): ScanOptions {
+  const options: ScanOptions = {};
+  const token = environment.GITHUB_TOKEN ?? environment.GH_TOKEN;
+  if (token !== undefined) {
+    options.token = token;
+  }
+  if (commandLine.maxBranches !== undefined) {
+    options.maxBranches = commandLine.maxBranches;
+  }
+  return options;
+}
+
+/** Runs the command and returns its exit code; errors are written, never thrown. */
+export async function run(argumentsList: string[], environment: NodeJS.ProcessEnv, output: Output): Promise<number> {
+  try {
+    const commandLine = parseArguments(argumentsList);
+    const options = buildScanOptions(commandLine, environment);
+    const result = await scan(commandLine.target, options);
+    output.write(formatResult(result, commandLine.format));
+    return result.findings.length === 0 ? EXIT_CLEAN : EXIT_FINDINGS;
+  } catch (error) {
+    output.error(error instanceof Error ? error.message : String(error));
+    return EXIT_ERROR;
+  }
+}
+
+/** Writes a text to the standard output. */
+function writeToStandardOutput(text: string): void {
+  process.stdout.write(`${text}\n`);
+}
+
+/** Writes a text to the standard error. */
+function writeToStandardError(text: string): void {
+  process.stderr.write(`${text}\n`);
+}
+
+/** Tells whether this file is the one started by node, and not a file imported by a test. */
+export function isMainModule(moduleUrl: string, startedFile: string | undefined): boolean {
+  if (startedFile === undefined) {
+    return false;
+  }
+  return realpathSync(startedFile) === fileURLToPath(moduleUrl);
+}
+
+/** Starts the command with the real arguments, environment and streams, and sets the exit code. */
+export async function main(): Promise<void> {
+  const output = { write: writeToStandardOutput, error: writeToStandardError };
+  process.exitCode = await run(process.argv.slice(2), process.env, output);
+}
+
+if (isMainModule(import.meta.url, process.argv[1])) {
+  await main();
+}
