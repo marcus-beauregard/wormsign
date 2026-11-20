@@ -134,6 +134,18 @@ function flagsOnlyLargeScriptsInPayloadPlaces(): void {
   expect(isLargeScript({ path: "scripts/setup.js", type: "tree" })).toBe(false);
 }
 
+/** Checks that the PowerShell twin of the payload is flagged by its known name, and no other .ps1 is. */
+function flagsTheMiasmaPowerShellPayload(): void {
+  expect(isLargeScript({ path: ".github/init.ps1", type: "blob", size: 600_000 })).toBe(true);
+  expect(isLargeScript({ path: "init.ps1", type: "blob", size: 600_000 })).toBe(true);
+  expect(isLargeScript({ path: "scripts/init.ps1", type: "blob", size: 600_000 })).toBe(true);
+  expect(isLargeScript({ path: "tools/build.ps1", type: "blob", size: 600_000 })).toBe(false);
+  expect(isLargeScript({ path: ".github/setup.ps1", type: "blob", size: 600_000 })).toBe(false);
+  expect(isLargeScript({ path: ".claude/tool.ps1", type: "blob", size: 600_000 })).toBe(false);
+  expect(isLargeScript({ path: ".github/init.ps1", type: "blob", size: 2_000 })).toBe(false);
+  expect(isLargeScript({ path: ".github/init.ps1", type: "tree", size: 600_000 })).toBe(false);
+}
+
 /** Checks the known worm commit markers. */
 function knowsWormMarkers(): void {
   expect(hasWormMarker("AutoSyncComplete: abc")).toBe(true);
@@ -189,6 +201,7 @@ function describeInstructionRules(): void {
 /** Groups the tests of the tree, commit and repository rules. */
 function describeTreeCommitAndRepositoryRules(): void {
   it("flags only large scripts in payload places", flagsOnlyLargeScriptsInPayloadPlaces);
+  it("flags the Miasma PowerShell payload", flagsTheMiasmaPowerShellPayload);
   it("knows worm markers", knowsWormMarkers);
   it("knows drop descriptions", knowsDropDescriptions);
   it("counts days before the push", countsDaysBeforePush);

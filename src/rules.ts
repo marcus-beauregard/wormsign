@@ -254,7 +254,7 @@ export function findInjectionPhrases(text: string): string[] {
 
 /** Tells whether a tree entry is a large script stored where agent payloads hide. */
 export function isLargeScript(entry: TreeEntry): boolean {
-  const isScript = entry.type === "blob" && SCRIPT_EXTENSION.test(entry.path);
+  const isScript = entry.type === "blob" && (SCRIPT_EXTENSION.test(entry.path) || SETUP_SCRIPT.test(entry.path));
   const isInPayloadPlace = PAYLOAD_FOLDER.test(entry.path) || SETUP_SCRIPT.test(entry.path);
   const isLarge = (entry.size ?? 0) >= LARGE_SCRIPT_BYTES;
   return isScript && isInPayloadPlace && isLarge;
