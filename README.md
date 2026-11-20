@@ -208,6 +208,7 @@ privately, as described in [SECURITY.md](SECURITY.md).
 - Bitdefender Labs, *How AI agents become new targets in a GitHub malware campaign*, November 2026.
 - SafeDep, *testmetest npm worm, a Miasma variant*, and *Mini Shai-Hulud strikes again*, 2026.
 - Wiz, *Shai-Hulud 2.0 ongoing supply chain attack*, November 2025.
+- More incidents, advisories and defenses for coding agents: [awesome-coding-agent-security](https://github.com/nukoe-labs/awesome-coding-agent-security).
 
 ## License
 
