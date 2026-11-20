@@ -27,3 +27,5 @@ export declare const INJECTION_PHRASES: RegExp[];
 export declare const PAYLOAD_FOLDER: RegExp;
 /** The setup scripts that worm hooks start, at the root or in scripts/. */
 export declare const SETUP_SCRIPT: RegExp;
+/** The commands that start a worm payload: a setup or init script, or a script downloaded and piped into a shell. */
+export declare const PAYLOAD_COMMANDS: Signature<RegExp>[];

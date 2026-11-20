@@ -1,5 +1,5 @@
 {
-  "date": "2026-11-20T00:47:46.807Z",
+  "date": "2026-11-20T00:49:00.714Z",
   "repositoriesPerOrganization": 20,
   "branchesPerRepository": 3,
   "results": [
@@ -39,6 +39,40 @@
       "repositories": 20,
       "wormSigns": [],
       "notes": 11
+    },
+    {
+      "organization": "astral-sh",
+      "repositories": 20,
+      "wormSigns": [
+        {
+          "rule": "WS001",
+          "severity": "high",
+          "repository": "astral-sh/uv",
+          "branch": "17929-renovate-conda-incubator-setup-miniconda-3.x",
+          "commit": "9db849ebd8407814a75e0e1f87948a737bd85bde",
+          "path": ".claude/settings.json",
+          "message": "Agent hook runs a command as soon as a session starts: \".claude/hooks/session-start.sh\"."
+        },
+        {
+          "rule": "WS001",
+          "severity": "high",
+          "repository": "astral-sh/uv",
+          "branch": "18442-renovate-rust-1.x",
+          "commit": "5eef9ae31156310b33e8e45be2304d61b4d596da",
+          "path": ".claude/settings.json",
+          "message": "Agent hook runs a command as soon as a session starts: \".claude/hooks/session-start.sh\"."
+        },
+        {
+          "rule": "WS001",
+          "severity": "high",
+          "repository": "astral-sh/uv",
+          "branch": "20421-documentation-is-incorrect-regarding-workspace-members",
+          "commit": "b8d0ef3e1b2df9b01524a42b88c2fa7624d4172a",
+          "path": ".claude/settings.json",
+          "message": "Agent hook runs a command as soon as a session starts: \"bash agents/hooks/session-start.sh\"."
+        }
+      ],
+      "notes": 3
     }
   ]
 }

@@ -86,8 +86,8 @@ legitimate projects and are printed so that a human reads the file.
 
 | Rule | Severity | What it finds |
 |---|---|---|
-| WS001 | high | A hook that runs a command as soon as an agent session starts (`SessionStart`, `Setup`) in `.claude/settings.json`, `.claude/settings.local.json`, `.gemini/settings.json` or `.cursor/hooks.json` |
-| WS002 | high | A task in `.vscode/tasks.json` with `"runOn": "folderOpen"` (VS Code, Cursor, Windsurf) |
+| WS001 | high | A hook that starts a worm payload (`setup.js`, `init.js`, or `curl ... \| sh`) as soon as an agent session starts, in `.claude/settings.json`, `.claude/settings.local.json`, `.gemini/settings.json` or `.cursor/hooks.json` |
+| WS002 | high | A task in `.vscode/tasks.json` with `"runOn": "folderOpen"` that starts a worm payload (VS Code, Cursor, Windsurf) |
 | WS003 | medium | A local MCP server command in `.mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json`, `.roo/mcp.json` or `.gemini/settings.json` |
 | WS004 | high | A script of 500 KB or more in `.claude/`, `.cursor/`, `.gemini/`, `.vscode/`, or named `setup.js` / `init.js` at the root, in `scripts/` or in `.github/` |
 | WS005 | high | Invisible or text-direction characters in `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `.cursorrules`, Cursor rules or Copilot instructions |
@@ -95,8 +95,9 @@ legitimate projects and are printed so that a human reads the file.
 | WS007 | critical | A branch head commit with a worm marker: `AutoSyncComplete:`, `msync-xxxx`, `DEVOPS-SEALED` |
 | WS008 | critical | An exfiltration repository: description `Sha1-Hulud: The Second Coming.`, `Shai-Hulud: Here We Go Again`, or `project-utils` with a random name such as `smart-workers-48213` |
 | WS009 | medium | A default branch whose head commit, next to an autorun finding, is dated 30 days or more before the last push |
-| WS010 | medium | A hook that runs a command on another agent event (after a tool call, before a prompt...) |
+| WS010 | medium | Any other agent hook that runs a command (formatters, linters, session checks) |
 | WS011 | critical | An instruction file that carries a worm marker (`DEVOPS-SEALED`) |
+| WS012 | medium | Any other `folderOpen` task (for example a watcher) |
 
 Every marker, with the public report it comes from, is in [`src/signatures.ts`](src/signatures.ts).
 

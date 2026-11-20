@@ -10,12 +10,12 @@ export declare const RULES: {
     readonly agentHook: {
         readonly id: "WS001";
         readonly severity: "high";
-        readonly title: "Agent hook runs a command as soon as a session starts";
+        readonly title: "Agent hook starts a worm payload as soon as a session starts";
     };
     readonly folderOpenTask: {
         readonly id: "WS002";
         readonly severity: "high";
-        readonly title: "Editor task runs when the folder is opened";
+        readonly title: "Editor task starts a worm payload when the folder is opened";
     };
     readonly mcpServer: {
         readonly id: "WS003";
@@ -55,12 +55,17 @@ export declare const RULES: {
     readonly toolHook: {
         readonly id: "WS010";
         readonly severity: "medium";
-        readonly title: "Agent hook runs a command on an agent event";
+        readonly title: "Agent hook runs a command";
     };
     readonly instructionMarker: {
         readonly id: "WS011";
         readonly severity: "critical";
         readonly title: "Instruction file carries a known worm marker";
+    };
+    readonly folderOpenCommand: {
+        readonly id: "WS012";
+        readonly severity: "medium";
+        readonly title: "Editor task runs a command when the folder is opened";
     };
 };
 /** The smallest size, in bytes, of a script considered as a hidden payload. */
@@ -98,6 +103,8 @@ export declare function hasInvisibleCharacters(text: string): boolean;
 export declare function findInjectionPhrases(text: string): string[];
 /** Tells whether a tree entry is a large script stored where agent payloads hide. */
 export declare function isLargeScript(entry: TreeEntry): boolean;
+/** Tells whether a command starts a worm payload: a setup or init script, or a downloaded script piped into a shell. */
+export declare function isPayloadCommand(command: string): boolean;
 /** Tells whether an instruction file carries a marker written by a known worm. */
 export declare function hasInstructionMarker(text: string): boolean;
 /** Tells whether a commit message carries a marker written by a known worm. */

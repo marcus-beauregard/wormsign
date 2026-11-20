@@ -34,3 +34,8 @@ export const INJECTION_PHRASES = [
 export const PAYLOAD_FOLDER = /^(?:\.claude|\.cursor|\.gemini|\.vscode)\//u;
 /** The setup scripts that worm hooks start, at the root or in scripts/. */
 export const SETUP_SCRIPT = /^(?:(?:scripts|\.github)\/)?(?:setup|init)\.(?:c|m)?js$/u;
+/** The commands that start a worm payload: a setup or init script, or a script downloaded and piped into a shell. */
+export const PAYLOAD_COMMANDS = [
+    { value: /(?:^|[\s"'/])(?:setup|init)\.(?:c|m)?js\b/u, worm: "Miasma, Mini Shai-Hulud", source: BITDEFENDER },
+    { value: /\b(?:curl|wget)\b[^|]*\|\s*(?:ba|z)?sh\b/u, worm: "Miasma", source: SAFEDEP_MIASMA },
+];

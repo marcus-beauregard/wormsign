@@ -1,4 +1,4 @@
-import { COMMIT_MARKERS, DROP_DESCRIPTIONS, INSTRUCTION_MARKERS, INJECTION_PHRASES, PAYLOAD_FOLDER, SESSION_START_EVENTS, SETUP_SCRIPT } from "./signatures.js";
+import { COMMIT_MARKERS, DROP_DESCRIPTIONS, INSTRUCTION_MARKERS, PAYLOAD_COMMANDS, INJECTION_PHRASES, PAYLOAD_FOLDER, SESSION_START_EVENTS, SETUP_SCRIPT } from "./signatures.js";
 import type { Signature } from "./signatures.js";
 import type { Severity, TreeEntry } from "./types.js";
 
@@ -11,8 +11,8 @@ export interface Rule {
 
 /** Every rule of wormsign, with its stable identifier. */
 export const RULES = {
-  agentHook: { id: "WS001", severity: "high", title: "Agent hook runs a command as soon as a session starts" },
-  folderOpenTask: { id: "WS002", severity: "high", title: "Editor task runs when the folder is opened" },
+  agentHook: { id: "WS001", severity: "high", title: "Agent hook starts a worm payload as soon as a session starts" },
+  folderOpenTask: { id: "WS002", severity: "high", title: "Editor task starts a worm payload when the folder is opened" },
   mcpServer: { id: "WS003", severity: "medium", title: "Repository declares a local MCP server command" },
   largeScript: { id: "WS004", severity: "high", title: "Large script next to the agent configuration" },
   invisibleUnicode: { id: "WS005", severity: "high", title: "Invisible characters in an agent instruction file" },
@@ -20,8 +20,9 @@ export const RULES = {
   wormMarker: { id: "WS007", severity: "critical", title: "Commit message carries a known worm marker" },
   dropRepository: { id: "WS008", severity: "critical", title: "Repository looks like a worm exfiltration drop" },
   backdatedCommit: { id: "WS009", severity: "medium", title: "Head commit is dated long before the last push" },
-  toolHook: { id: "WS010", severity: "medium", title: "Agent hook runs a command on an agent event" },
+  toolHook: { id: "WS010", severity: "medium", title: "Agent hook runs a command" },
   instructionMarker: { id: "WS011", severity: "critical", title: "Instruction file carries a known worm marker" },
+  folderOpenCommand: { id: "WS012", severity: "medium", title: "Editor task runs a command when the folder is opened" },
 } as const satisfies Record<string, Rule>;
 
 /** The smallest size, in bytes, of a script considered as a hidden payload. */
@@ -170,6 +171,11 @@ export function isLargeScript(entry: TreeEntry): boolean {
   const isInPayloadPlace = PAYLOAD_FOLDER.test(entry.path) || SETUP_SCRIPT.test(entry.path);
   const isLarge = (entry.size ?? 0) >= LARGE_SCRIPT_BYTES;
   return isScript && isInPayloadPlace && isLarge;
+}
+
+/** Tells whether a command starts a worm payload: a setup or init script, or a downloaded script piped into a shell. */
+export function isPayloadCommand(command: string): boolean {
+  return PAYLOAD_COMMANDS.some(matchesMessage, command);
 }
 
 /** Tells whether an instruction file carries a marker written by a known worm. */

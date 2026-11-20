@@ -16,6 +16,7 @@ import {
   isDropDescription,
   isInstructionFile,
   isLargeScript,
+  isPayloadCommand,
   type Rule,
 } from "./rules.js";
 import type { BranchInfo, Finding, RepositoryInfo, TreeEntry } from "./types.js";
@@ -62,11 +63,15 @@ export function checkFileText(path: string, text: string, place: Place): Finding
   const findings: Finding[] = [];
   if (HOOK_FILES.has(path)) {
     const hookCommands = findHookCommands(text);
-    findings.push(...checkCommands(RULES.agentHook, hookCommands.sessionStart, filePlace));
-    findings.push(...checkCommands(RULES.toolHook, hookCommands.otherEvents, filePlace));
+    const payloadHooks = hookCommands.sessionStart.filter(isPayloadCommand);
+    const otherHooks = [...hookCommands.sessionStart.filter(isOrdinaryCommand), ...hookCommands.otherEvents];
+    findings.push(...checkCommands(RULES.agentHook, payloadHooks, filePlace));
+    findings.push(...checkCommands(RULES.toolHook, otherHooks, filePlace));
   }
   if (path === TASKS_FILE) {
-    findings.push(...checkCommands(RULES.folderOpenTask, findFolderOpenTasks(text), filePlace));
+    const tasks = findFolderOpenTasks(text);
+    findings.push(...checkCommands(RULES.folderOpenTask, tasks.filter(isPayloadCommand), filePlace));
+    findings.push(...checkCommands(RULES.folderOpenCommand, tasks.filter(isOrdinaryCommand), filePlace));
   }
   if (MCP_FILES.has(path)) {
     findings.push(...checkCommands(RULES.mcpServer, findMcpCommands(text), filePlace));
@@ -75,6 +80,11 @@ export function checkFileText(path: string, text: string, place: Place): Finding
     findings.push(...checkInstructionText(text, filePlace));
   }
   return findings;
+}
+
+/** Tells whether a command does not start a known worm payload. */
+function isOrdinaryCommand(command: string): boolean {
+  return !isPayloadCommand(command);
 }
 
 /** Returns one finding listing the commands, or nothing when there is no command. */

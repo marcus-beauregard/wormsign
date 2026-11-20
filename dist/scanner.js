@@ -1,5 +1,5 @@
 import { getCommit, getFileText, getTree, listBranches } from "./github.js";
-import { BACKDATED_DAYS, HOOK_FILES, MCP_FILES, RULES, TASKS_FILE, daysBeforePush, findFolderOpenTasks, findHookCommands, findInjectionPhrases, findMcpCommands, hasInstructionMarker, hasInvisibleCharacters, hasWormMarker, isDropDescription, isInstructionFile, isLargeScript, } from "./rules.js";
+import { BACKDATED_DAYS, HOOK_FILES, MCP_FILES, RULES, TASKS_FILE, daysBeforePush, findFolderOpenTasks, findHookCommands, findInjectionPhrases, findMcpCommands, hasInstructionMarker, hasInvisibleCharacters, hasWormMarker, isDropDescription, isInstructionFile, isLargeScript, isPayloadCommand, } from "./rules.js";
 /** The default highest number of branches read per repository. */
 export const DEFAULT_MAX_BRANCHES = 20;
 /** The rules whose findings mean that code can run when the folder is opened. */
@@ -24,11 +24,15 @@ export function checkFileText(path, text, place) {
     const findings = [];
     if (HOOK_FILES.has(path)) {
         const hookCommands = findHookCommands(text);
-        findings.push(...checkCommands(RULES.agentHook, hookCommands.sessionStart, filePlace));
-        findings.push(...checkCommands(RULES.toolHook, hookCommands.otherEvents, filePlace));
+        const payloadHooks = hookCommands.sessionStart.filter(isPayloadCommand);
+        const otherHooks = [...hookCommands.sessionStart.filter(isOrdinaryCommand), ...hookCommands.otherEvents];
+        findings.push(...checkCommands(RULES.agentHook, payloadHooks, filePlace));
+        findings.push(...checkCommands(RULES.toolHook, otherHooks, filePlace));
     }
     if (path === TASKS_FILE) {
-        findings.push(...checkCommands(RULES.folderOpenTask, findFolderOpenTasks(text), filePlace));
+        const tasks = findFolderOpenTasks(text);
+        findings.push(...checkCommands(RULES.folderOpenTask, tasks.filter(isPayloadCommand), filePlace));
+        findings.push(...checkCommands(RULES.folderOpenCommand, tasks.filter(isOrdinaryCommand), filePlace));
     }
     if (MCP_FILES.has(path)) {
         findings.push(...checkCommands(RULES.mcpServer, findMcpCommands(text), filePlace));
@@ -37,6 +41,10 @@ export function checkFileText(path, text, place) {
         findings.push(...checkInstructionText(text, filePlace));
     }
     return findings;
+}
+/** Tells whether a command does not start a known worm payload. */
+function isOrdinaryCommand(command) {
+    return !isPayloadCommand(command);
 }
 /** Returns one finding listing the commands, or nothing when there is no command. */
 function checkCommands(rule, commands, place) {
