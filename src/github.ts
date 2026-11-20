@@ -181,10 +181,13 @@ function readCharacterCode(character: string): number {
   return character.charCodeAt(0);
 }
 
-/** Reads a small text file at a commit and returns its text, or undefined when the file is missing. */
+/** Reads a small text file at a commit and returns its text, or undefined when the file is missing or is a symbolic link. */
 export async function getFileText(client: GitHubClient, fullName: string, path: string, sha: string): Promise<string | undefined> {
   try {
-    const file = await client.getJson<{ content: string }>(`/repos/${fullName}/contents/${encodeURI(path)}?ref=${sha}`);
+    const file = await client.getJson<{ content?: string }>(`/repos/${fullName}/contents/${encodeURI(path)}?ref=${sha}`);
+    if (typeof file.content !== "string") {
+      return undefined;
+    }
     return decodeBase64Text(file.content);
   } catch (error) {
     const fileIsMissing = error instanceof GitHubError && error.status === NOT_FOUND_STATUS;

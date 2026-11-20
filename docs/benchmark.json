@@ -1,5 +1,5 @@
 {
-  "date": "2026-11-20T01:03:15.289Z",
+  "date": "2026-11-20T01:17:57.355Z",
   "repositoriesPerOrganization": 20,
   "branchesPerRepository": 3,
   "results": [
@@ -41,6 +41,24 @@
     },
     {
       "organization": "vitejs",
+      "repositories": 20,
+      "wormSigns": [],
+      "notes": 0
+    },
+    {
+      "organization": "vitest-dev",
+      "repositories": 9,
+      "wormSigns": [],
+      "notes": 0
+    },
+    {
+      "organization": "biomejs",
+      "repositories": 20,
+      "wormSigns": [],
+      "notes": 0
+    },
+    {
+      "organization": "withastro",
       "repositories": 20,
       "wormSigns": [],
       "notes": 0

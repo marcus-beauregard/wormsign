@@ -25,7 +25,7 @@ export declare function listBranches(client: GitHubClient, fullName: string, max
 export declare function getTree(client: GitHubClient, fullName: string, sha: string): Promise<TreeEntry[]>;
 /** Turns the base64 content sent by GitHub into text, the same way in Node.js and in a browser. */
 export declare function decodeBase64Text(content: string): string;
-/** Reads a small text file at a commit and returns its text, or undefined when the file is missing. */
+/** Reads a small text file at a commit and returns its text, or undefined when the file is missing or is a symbolic link. */
 export declare function getFileText(client: GitHubClient, fullName: string, path: string, sha: string): Promise<string | undefined>;
 /** Reads one commit of a repository. */
 export declare function getCommit(client: GitHubClient, fullName: string, sha: string): Promise<CommitInfo>;

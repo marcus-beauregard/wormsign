@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createGitHubClient, decodeBase64Text, readWaitMilliseconds } from "../src/github.js";
+import { createGitHubClient, decodeBase64Text, getFileText, readWaitMilliseconds } from "../src/github.js";
 import { scan } from "../src/index.js";
 import { createFakeFetch } from "./fake-github.js";
 
@@ -87,6 +87,13 @@ function decodesBase64Text(): void {
   expect(decodeBase64Text("w6l0w6k=\n")).toBe("été");
 }
 
+/** Checks that a symbolic link, which the contents API returns without content, is skipped. */
+async function skipsSymbolicLinks(): Promise<void> {
+  const answers = { "/repos/o/r/contents/CLAUDE.md?ref=abc": { body: { type: "symlink", target: "AGENTS.md" } } };
+  const client = createGitHubClient({ fetch: createFakeFetch(answers) });
+  expect(await getFileText(client, "o/r", "CLAUDE.md", "abc")).toBeUndefined();
+}
+
 /** Checks that the scan reports each repository before reading it. */
 async function reportsProgress(): Promise<void> {
   const repositories = [{ full_name: "a/one", name: "one", description: null, default_branch: "main", pushed_at: "2026-01-01T00:00:00Z", archived: false }];
@@ -109,6 +116,7 @@ function describeLimits(): void {
   it("waits with the real timer", waitsWithTheRealTimer);
   it("decodes base64 text", decodesBase64Text);
   it("reports progress", reportsProgress);
+  it("skips symbolic links", skipsSymbolicLinks);
 }
 
 describe("rate limit and progress", describeLimits);
