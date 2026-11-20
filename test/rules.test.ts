@@ -6,6 +6,7 @@ import {
   findHookCommands,
   findInjectionPhrases,
   findMcpCommands,
+  findMcpTomlCommands,
   hasInvisibleCharacters,
   hasWormMarker,
   hasInstructionMarker,
@@ -14,7 +15,7 @@ import {
   isLargeScript,
   parseJson,
 } from "../src/rules.js";
-import { WORM_MCP, WORM_SETTINGS, WORM_TASKS } from "./fake-github.js";
+import { WORM_CODEX, WORM_MCP, WORM_SETTINGS, WORM_TASKS } from "./fake-github.js";
 
 /** Checks that the command of a SessionStart hook is found. */
 function findsTheCommandOfASessionStartHook(): void {
@@ -58,6 +59,47 @@ function findsMcpCommands(): void {
   expect(findMcpCommands(JSON.stringify({ servers: { local: { command: "uvx tool" } } }))).toEqual(["uvx tool"]);
   expect(findMcpCommands(JSON.stringify({ servers: { remote: { url: "https://example.com/mcp" } } }))).toEqual([]);
   expect(findMcpCommands("1")).toEqual([]);
+}
+
+/** Checks that MCP commands are read from Codex TOML server tables, and that other tables and shapes are ignored. */
+function findsCodexMcpCommands(): void {
+  expect(findMcpTomlCommands(WORM_CODEX)).toEqual(["node"]);
+  const twoServers = [
+    "[mcp_servers.docs]",
+    "command = 'uvx tool'   # a literal string, no escapes",
+    '[mcp_servers."quoted name"] # a quoted key',
+    'command = "npx -y env"',
+  ].join("\n");
+  expect(findMcpTomlCommands(twoServers)).toEqual(["uvx tool", "npx -y env"]);
+  const notServers = [
+    "[mcp_servers.local.env]",
+    'command = "an environment variable named command"',
+    "[project]",
+    'command = "not a server"',
+    "[mcp_servers]",
+    'local = { command = "an inline table" }',
+  ].join("\n");
+  expect(findMcpTomlCommands(notServers)).toEqual([]);
+  const oddValues = [
+    "[mcp_servers.local]",
+    "command = 5",
+    'command = ""',
+    'command = "node \\"x\\" C:\\\\tools"',
+    'command = "a\\nb"',
+    'command = "unterminated',
+    "args = [\"scripts/setup.js\"]",
+  ].join("\n");
+  expect(findMcpTomlCommands(oddValues)).toEqual(['node "x" C:\\tools', "a\\nb"]);
+  const brokenTables = [
+    "[mcp_servers.local",
+    'command = "node"',
+    "[mcp_servers.other]",
+    'command = "npx"',
+  ].join("\n");
+  expect(findMcpTomlCommands(brokenTables)).toEqual(["npx"]);
+  const brokenAfterServer = ["[mcp_servers.local]", 'command = "node"', "[mcp_servers", 'command = "late"'].join("\n");
+  expect(findMcpTomlCommands(brokenAfterServer)).toEqual(["node"]);
+  expect(findMcpTomlCommands("not toml at all")).toEqual([]);
 }
 
 /** Checks the list of instruction files and Cursor rules. */
@@ -134,6 +176,7 @@ function describeConfigurationRules(): void {
   it("finds tasks that run on folder open", findsFolderOpenTasks);
   it("ignores task files without tasks", ignoresTaskFilesWithoutTasks);
   it("finds MCP server commands", findsMcpCommands);
+  it("finds Codex MCP server commands", findsCodexMcpCommands);
 }
 
 /** Groups the tests of the instruction rules. */

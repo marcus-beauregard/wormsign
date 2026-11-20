@@ -1,5 +1,5 @@
 import { getCommit, getFileText, getTree, listBranches } from "./github.js";
-import { BACKDATED_DAYS, HOOK_FILES, MCP_FILES, RULES, TASKS_FILE, daysBeforePush, findFolderOpenTasks, findHookCommands, findInjectionPhrases, findMcpCommands, hasInstructionMarker, hasInvisibleCharacters, hasWormMarker, isDropDescription, isInstructionFile, isLargeScript, isPayloadCommand, } from "./rules.js";
+import { BACKDATED_DAYS, HOOK_FILES, MCP_FILES, MCP_TOML_FILES, RULES, TASKS_FILE, daysBeforePush, findFolderOpenTasks, findHookCommands, findInjectionPhrases, findMcpCommands, findMcpTomlCommands, hasInstructionMarker, hasInvisibleCharacters, hasWormMarker, isDropDescription, isInstructionFile, isLargeScript, isPayloadCommand, } from "./rules.js";
 /** The default highest number of branches read per repository. */
 export const DEFAULT_MAX_BRANCHES = 20;
 /** The rules whose findings mean that code can run when the folder is opened. */
@@ -37,6 +37,9 @@ export function checkFileText(path, text, place) {
     if (MCP_FILES.has(path)) {
         findings.push(...checkCommands(RULES.mcpServer, findMcpCommands(text), filePlace));
     }
+    if (MCP_TOML_FILES.has(path)) {
+        findings.push(...checkCommands(RULES.mcpServer, findMcpTomlCommands(text), filePlace));
+    }
     if (isInstructionFile(path)) {
         findings.push(...checkInstructionText(text, filePlace));
     }
@@ -71,7 +74,7 @@ function checkInstructionText(text, place) {
 }
 /** Tells whether the text of this file must be read to check it. */
 function mustReadFile(entry) {
-    const isConfiguration = HOOK_FILES.has(entry.path) || MCP_FILES.has(entry.path) || entry.path === TASKS_FILE;
+    const isConfiguration = HOOK_FILES.has(entry.path) || MCP_FILES.has(entry.path) || MCP_TOML_FILES.has(entry.path) || entry.path === TASKS_FILE;
     return entry.type === "blob" && (isConfiguration || isInstructionFile(entry.path));
 }
 /** Returns a finding for each large script hidden next to the agent configuration. */

@@ -3,6 +3,7 @@ import {
   BACKDATED_DAYS,
   HOOK_FILES,
   MCP_FILES,
+  MCP_TOML_FILES,
   RULES,
   TASKS_FILE,
   daysBeforePush,
@@ -10,6 +11,7 @@ import {
   findHookCommands,
   findInjectionPhrases,
   findMcpCommands,
+  findMcpTomlCommands,
   hasInstructionMarker,
   hasInvisibleCharacters,
   hasWormMarker,
@@ -76,6 +78,9 @@ export function checkFileText(path: string, text: string, place: Place): Finding
   if (MCP_FILES.has(path)) {
     findings.push(...checkCommands(RULES.mcpServer, findMcpCommands(text), filePlace));
   }
+  if (MCP_TOML_FILES.has(path)) {
+    findings.push(...checkCommands(RULES.mcpServer, findMcpTomlCommands(text), filePlace));
+  }
   if (isInstructionFile(path)) {
     findings.push(...checkInstructionText(text, filePlace));
   }
@@ -114,7 +119,8 @@ function checkInstructionText(text: string, place: Place): Finding[] {
 
 /** Tells whether the text of this file must be read to check it. */
 function mustReadFile(entry: TreeEntry): boolean {
-  const isConfiguration = HOOK_FILES.has(entry.path) || MCP_FILES.has(entry.path) || entry.path === TASKS_FILE;
+  const isConfiguration =
+    HOOK_FILES.has(entry.path) || MCP_FILES.has(entry.path) || MCP_TOML_FILES.has(entry.path) || entry.path === TASKS_FILE;
   return entry.type === "blob" && (isConfiguration || isInstructionFile(entry.path));
 }
 
