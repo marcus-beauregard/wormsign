@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 import { realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { formatJson, formatSarif, formatText, scan } from "./index.js";
+import { formatJson, formatSarif, formatText, isWormSign, scan } from "./index.js";
 import type { ScanOptions, ScanResult } from "./index.js";
 
 /** The version printed in reports, kept equal to the one in package.json. */
-export const VERSION = "0.1.0";
+export const VERSION = "1.0.0";
 
 /** The exit code when no finding was found. */
 export const EXIT_CLEAN = 0;
-/** The exit code when at least one finding was found. */
+/** The exit code when at least one worm sign (critical or high) was found; notes to review alone keep 0. */
 export const EXIT_FINDINGS = 1;
 /** The exit code when the scan could not run. */
 export const EXIT_ERROR = 2;
@@ -58,20 +58,22 @@ export function parseArguments(argumentsList: string[]): CommandLine {
 }
 
 /** Writes the scan result in the format chosen on the command line. */
-export function formatResult(result: ScanResult, format: CommandLine["format"]): string {
+export function formatResult(result: ScanResult, format: CommandLine["format"], useColor = false): string {
   if (format === "json") {
     return formatJson(result.findings);
   }
   if (format === "sarif") {
     return formatSarif(result.findings, VERSION);
   }
-  return formatText(result.findings, result.scannedRepositories);
+  return formatText(result.findings, result.scannedRepositories, useColor);
 }
 
 /** The streams the command writes to, replaceable in tests. */
 export interface Output {
   write: (text: string) => void;
   error: (text: string) => void;
+  /** Tells whether the text report may use terminal colors. */
+  useColor?: boolean;
 }
 
 /** Builds the scan options from the command line and the token found in the environment. */
@@ -93,8 +95,9 @@ export async function run(argumentsList: string[], environment: NodeJS.ProcessEn
     const commandLine = parseArguments(argumentsList);
     const options = buildScanOptions(commandLine, environment);
     const result = await scan(commandLine.target, options);
-    output.write(formatResult(result, commandLine.format));
-    return result.findings.length === 0 ? EXIT_CLEAN : EXIT_FINDINGS;
+    output.write(formatResult(result, commandLine.format, output.useColor === true));
+    const hasWormSign = result.findings.some(isWormSign);
+    return hasWormSign ? EXIT_FINDINGS : EXIT_CLEAN;
   } catch (error) {
     output.error(error instanceof Error ? error.message : String(error));
     return EXIT_ERROR;
@@ -119,9 +122,16 @@ export function isMainModule(moduleUrl: string, startedFile: string | undefined)
   return realpathSync(startedFile) === fileURLToPath(moduleUrl);
 }
 
+/** Tells whether to color the report: only on a terminal, and never when NO_COLOR is set (https://no-color.org). */
+export function shouldUseColor(isTerminal: boolean | undefined, environment: NodeJS.ProcessEnv): boolean {
+  const colorIsRefused = environment.NO_COLOR !== undefined && environment.NO_COLOR !== "";
+  return isTerminal === true && !colorIsRefused;
+}
+
 /** Starts the command with the real arguments, environment and streams, and sets the exit code. */
 export async function main(): Promise<void> {
-  const output = { write: writeToStandardOutput, error: writeToStandardError };
+  const useColor = shouldUseColor(process.stdout.isTTY, process.env);
+  const output = { write: writeToStandardOutput, error: writeToStandardError, useColor };
   process.exitCode = await run(process.argv.slice(2), process.env, output);
 }
 

@@ -1,7 +1,7 @@
 import type { FetchFunction } from "../src/types.js";
 
 /** One answer of the fake API: a JSON body, or an HTTP error status. */
-export type FakeAnswer = { body: unknown } | { status: number };
+export type FakeAnswer = { body: unknown; headers?: Record<string, string> } | { status: number; headers?: Record<string, string> };
 
 /** Encodes a text the way the contents API returns it. */
 export function encodeFile(text: string): { content: string } {
@@ -15,10 +15,11 @@ export function createFakeFetch(answers: Record<string, FakeAnswer>, requests: {
     requests.push({ url, ...(init === undefined ? {} : { init }) });
     const path = url.replace("https://api.github.com", "");
     const answer = answers[path] ?? { status: 404 };
+    const headers = answer.headers ?? {};
     if ("status" in answer) {
-      return new Response("{}", { status: answer.status });
+      return new Response("{}", { status: answer.status, headers });
     }
-    return new Response(JSON.stringify(answer.body), { status: 200 });
+    return new Response(JSON.stringify(answer.body), { status: 200, headers });
   }
   return fakeFetch;
 }

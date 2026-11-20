@@ -5,6 +5,11 @@ const PAGE_SIZE = 100;
 const NOT_FOUND_STATUS = 404;
 const LIMIT_STATUSES = new Set([403, 429]);
 const LIMIT_HINT = " The rate limit may be reached: set GITHUB_TOKEN, for example GITHUB_TOKEN=$(gh auth token).";
+const NO_TOKEN_HINT = " Without a token GitHub allows 60 requests per hour; with GITHUB_TOKEN=$(gh auth token) it allows 5,000.";
+const MILLISECONDS_PER_SECOND = 1000;
+/** The default longest wait, in seconds, for the rate limit to reset before giving up. */
+export const DEFAULT_MAX_WAIT_SECONDS = 300;
+const MAX_ATTEMPTS = 3;
 
 /** The error thrown when the GitHub API refuses a request or cannot be reached. */
 export class GitHubError extends Error {
@@ -46,20 +51,72 @@ async function sendRequest(fetchFunction: FetchFunction, url: string, headers: R
   }
 }
 
-/** Creates a client that reads the GitHub REST API with the given options. */
+/** Tells the caller how many requests GitHub still allows, when GitHub sends the numbers. */
+function reportRateLimit(response: Response, onRateLimit: ScanOptions["onRateLimit"]): void {
+  const remaining = response.headers.get("x-ratelimit-remaining");
+  const limit = response.headers.get("x-ratelimit-limit");
+  if (onRateLimit === undefined || remaining === null || limit === null) {
+    return;
+  }
+  onRateLimit(Number(remaining), Number(limit));
+}
+
+/** Returns how many milliseconds GitHub asks to wait before the next request, or undefined when it is not a rate limit. */
+export function readWaitMilliseconds(response: Response, now: number): number | undefined {
+  if (!LIMIT_STATUSES.has(response.status)) {
+    return undefined;
+  }
+  const retryAfter = response.headers.get("retry-after");
+  if (retryAfter !== null) {
+    return Number(retryAfter) * MILLISECONDS_PER_SECOND;
+  }
+  const reset = response.headers.get("x-ratelimit-reset");
+  if (response.headers.get("x-ratelimit-remaining") !== "0" || reset === null) {
+    return undefined;
+  }
+  return Math.max(0, Number(reset) * MILLISECONDS_PER_SECOND - now);
+}
+
+/** Waits for the given number of milliseconds. */
+function sleep(milliseconds: number): Promise<void> {
+  return new Promise<void>(function waitThenResolve(resolve: () => void): void {
+    setTimeout(resolve, milliseconds);
+  });
+}
+
+/** Builds the error of a refused request, with a hint on the rate limit when it may be the cause. */
+function buildRefusalError(response: Response, path: string, hasToken: boolean): GitHubError {
+  const isLimit = LIMIT_STATUSES.has(response.status);
+  const hint = isLimit && !hasToken ? NO_TOKEN_HINT : "";
+  const limitHint = isLimit && hasToken ? LIMIT_HINT : hint;
+  return new GitHubError(`GitHub answered ${response.status} for ${path}.${limitHint}`, response.status);
+}
+
+/** Creates a client that reads the GitHub REST API with the given options, and waits when the rate limit is reached. */
 export function createGitHubClient(options: ScanOptions): GitHubClient {
   const fetchFunction = options.fetch ?? globalThis.fetch;
   const apiUrl = options.apiUrl ?? DEFAULT_API_URL;
   const headers = buildHeaders(options.token);
+  const hasToken = options.token !== undefined && options.token !== "";
+  const maxWait = (options.maxWaitSeconds ?? DEFAULT_MAX_WAIT_SECONDS) * MILLISECONDS_PER_SECOND;
+  const wait = options.sleep ?? sleep;
 
   /** Reads one API path and returns its JSON body, or throws a GitHubError with the HTTP status. */
   async function getJson<T>(path: string): Promise<T> {
-    const response = await sendRequest(fetchFunction, `${apiUrl}${path}`, headers);
-    if (!response.ok) {
-      const hint = LIMIT_STATUSES.has(response.status) ? LIMIT_HINT : "";
-      throw new GitHubError(`GitHub answered ${response.status} for ${path}.${hint}`, response.status);
+    for (let attempt = 1; attempt < MAX_ATTEMPTS; attempt += 1) {
+      const response = await sendRequest(fetchFunction, `${apiUrl}${path}`, headers);
+      reportRateLimit(response, options.onRateLimit);
+      if (response.ok) {
+        return (await response.json()) as T;
+      }
+      const waitMilliseconds = readWaitMilliseconds(response, Date.now());
+      if (waitMilliseconds === undefined || waitMilliseconds > maxWait) {
+        throw buildRefusalError(response, path, hasToken);
+      }
+      options.onWait?.(Math.ceil(waitMilliseconds / MILLISECONDS_PER_SECOND));
+      await wait(waitMilliseconds);
     }
-    return (await response.json()) as T;
+    throw new GitHubError(`GitHub kept refusing ${path} after waiting for the rate limit.${LIMIT_HINT}`);
   }
 
   return { getJson };
@@ -98,11 +155,23 @@ export async function getTree(client: GitHubClient, fullName: string, sha: strin
   return tree.tree;
 }
 
+/** Turns the base64 content sent by GitHub into text, the same way in Node.js and in a browser. */
+export function decodeBase64Text(content: string): string {
+  const binary = atob(content.replace(/\s/gu, ""));
+  const bytes = Uint8Array.from(binary, readCharacterCode);
+  return new TextDecoder().decode(bytes);
+}
+
+/** Returns the code of one character of a binary string, which is the value of one byte. */
+function readCharacterCode(character: string): number {
+  return character.charCodeAt(0);
+}
+
 /** Reads a small text file at a commit and returns its text, or undefined when the file is missing. */
 export async function getFileText(client: GitHubClient, fullName: string, path: string, sha: string): Promise<string | undefined> {
   try {
     const file = await client.getJson<{ content: string }>(`/repos/${fullName}/contents/${encodeURI(path)}?ref=${sha}`);
-    return Buffer.from(file.content, "base64").toString("utf8");
+    return decodeBase64Text(file.content);
   } catch (error) {
     const fileIsMissing = error instanceof GitHubError && error.status === NOT_FOUND_STATUS;
     if (fileIsMissing) {

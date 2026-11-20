@@ -1,0 +1,54 @@
+name: Action test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "23 5 * * 1"
+
+permissions: {}
+
+jobs:
+  clean-organization:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: scan
+        uses: ./
+        with:
+          target: nukoe-labs
+      - name: Check the outputs
+        env:
+          FINDINGS: ${{ steps.scan.outputs.findings }}
+          REPOSITORIES: ${{ steps.scan.outputs.repositories }}
+        run: test "$FINDINGS" = 0 && test "$REPOSITORIES" -gt 0
+
+  known-infected-repository:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: scan
+        uses: ./
+        with:
+          # This repository is named in the SafeDep report on the Miasma worm; it stays infected at the time of writing.
+          target: ConcordiaDev/theme_saimaniq
+          fail-on-findings: "false"
+          sarif: "true"
+      - name: Check that the worm is found and the SARIF file is written
+        env:
+          FINDINGS: ${{ steps.scan.outputs.findings }}
+        run: |
+          if [ "$FINDINGS" = "0" ]; then
+            echo "::notice::The repository has been cleaned or deleted; nothing to check."
+            exit 0
+          fi
+          grep -q '"ruleId": "WS001"' wormsign.sarif

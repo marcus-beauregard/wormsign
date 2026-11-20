@@ -1,86 +1,114 @@
 # wormsign
 
 [![CI](https://github.com/nukoe-labs/wormsign/actions/workflows/ci.yml/badge.svg)](https://github.com/nukoe-labs/wormsign/actions/workflows/ci.yml)
-![Coverage 100%](https://img.shields.io/badge/coverage-100%25-brightgreen)
+[![npm](https://img.shields.io/npm/v/wormsign)](https://www.npmjs.com/package/wormsign)
+![Coverage 100%, enforced by CI](https://img.shields.io/badge/coverage-100%25%20enforced-brightgreen)
 ![Dependencies 0](https://img.shields.io/badge/dependencies-0-brightgreen)
 [![License MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-**Find out if an AI-agent worm has armed your GitHub repositories, without cloning anything.**
+**Find Shai-Hulud and Miasma worm infections in a GitHub account or organization, on every branch, through the
+GitHub API only. Nothing is cloned, nothing is run.**
 
-Since 2026, worms such as Mini Shai-Hulud and Miasma steal a developer's GitHub token and push files into all of
-their repositories. Those files run as soon as someone opens the folder with Claude Code, Cursor, Gemini CLI or
-VS Code: a `SessionStart` hook, a `folderOpen` task, an MCP server, and a 3.7 MB obfuscated `setup.js`. Bitdefender
-listed 22 armed repositories in November 2026; several were still online, and one owner who cleaned up was
-re-infected a few days later because the token was still valid.
+```sh
+npx wormsign <user | organization | owner/repo>
+```
 
-`wormsign` answers, in one command, the question every victim and every organization asks: **which of my
-repositories, on which branches, carry the worm, and is it back?**
+![wormsign finds a Miasma infection in a repository named in a public SafeDep report](docs/demo.gif)
 
-![wormsign finds 7 worm signs in a repository listed by Bitdefender](docs/demo.png)
+*Real recording, 20/11/2026, of a repository named in
+[SafeDep's report on the Miasma worm](https://safedep.io/testmetest-npm-worm-miasma-variant/) (its owner was
+notified). Exit code 1 means that worm signs were found.*
 
-*Real output, 20/11/2026, on a repository listed in
-[Bitdefender's IOC table](https://www.bitdefender.com/en-us/blog/labs/how-ai-agents-become-new-targets-in-github-malware-campaign)
-(its owners were notified).*
+## Why
+
+Since late 2025, the Shai-Hulud family of worms (Shai-Hulud 2.0, Mini Shai-Hulud, Miasma) steals a developer's
+GitHub token, then pushes files into **all** of their repositories. Those files run as soon as someone opens the
+folder with Claude Code, Cursor, Gemini CLI or VS Code: a `SessionStart` hook, a `folderOpen` task, a 3.7 MB
+obfuscated `setup.js`. Every person who clones the repository and opens it becomes the next victim.
+
+Victims clean the default branch and forget the others. Some are re-infected days later because the token was still
+valid. `wormsign` answers the question every victim and every organization asks: **which of my repositories, on
+which branches, carry the worm, and is it back?**
+
+<!-- STUDY:START -->
+<!-- STUDY:END -->
 
 ## Install and run
 
 ```sh
-GITHUB_TOKEN=$(gh auth token) npx wormsign <user | organization | owner/repo>
+npx wormsign my-org                         # no install, no configuration
+GITHUB_TOKEN=$(gh auth token) npx wormsign my-org   # 5,000 requests per hour instead of 60
+npx wormsign owner/repo                     # check one repository BEFORE you clone it
+npx wormsign my-org --json                  # for scripts
+npx wormsign my-org --sarif > wormsign.sarif # for the GitHub Security tab
 ```
 
-- **API only**: files are read through the GitHub REST API. Nothing is cloned or written to disk, so nothing can run,
-  even by mistake. Use `owner/repo` to check a repository **before** you clone it.
-- **Every branch**: worms also arm feature branches (up to 20 per repository by default, `--max-branches <n>`).
-- **Zero dependencies**, Node.js 20 or later.
-- Exit code `0` when clean, `1` when something was found, `2` when the scan could not run.
-- `--json` for scripts, `--sarif` for the GitHub Security tab.
+| Exit code | Meaning |
+|---|---|
+| `0` | No worm sign. Notes to review (medium findings) may be printed. |
+| `1` | At least one worm sign (critical or high finding). Follow [the guide](docs/if-you-are-hit.md). |
+| `2` | The scan could not run (unknown owner, network, rate limit too far away). |
 
-Without a token, GitHub allows 60 requests per hour, which is enough for one small repository.
+- **Every branch**: up to 20 branches per repository by default (`--max-branches <n>`), each commit read once.
+- **Rate limits handled**: when GitHub asks to wait less than 5 minutes, wormsign waits and retries; otherwise it
+  stops with the reset time and the fix. Large accounts are read page by page.
+- **Zero dependencies**, Node.js 20 or later, colored output on a terminal (`NO_COLOR` is respected).
+
+## How it works
+
+```mermaid
+flowchart LR
+  A[wormsign] -->|1. list repositories| G[(api.github.com)]
+  A -->|2. list branches| G
+  A -->|3. read the file tree of each branch head| G
+  A -->|4. read only agent and editor configuration files| G
+  A -->|5. read the head commit message and date| G
+  A --> R[Report: text, JSON or SARIF]
+```
+
+wormsign only sends `GET` requests to `api.github.com`. It never writes to GitHub, never downloads a whole
+repository, never writes to your disk (except the SARIF file you ask for), and sends no data anywhere else: there is
+no telemetry and no server of ours. You can check it in [`src/github.ts`](src/github.ts), the only file that makes
+network requests.
+
+Words used below:
+
+- **Hook**: a command that an AI coding agent runs by itself at a given moment, for example when a session starts.
+- **`folderOpen` task**: a VS Code task (also in Cursor and Windsurf) that runs when the folder is opened.
+- **MCP server**: a local program that an agent starts to get new tools (MCP means Model Context Protocol).
+- **Exfiltration repository**: a repository created by the worm, under the victim's name, to publish stolen secrets.
+- **Branch head**: the latest commit of a branch.
 
 ## Rules
 
+Critical and high findings are **worm signs** (exit code 1). Medium findings are **notes**: they can match
+legitimate projects and are printed so that a human reads the file.
+
 | Rule | Severity | What it finds |
 |---|---|---|
-| WS001 | high | A hook in `.claude/settings.json`, `.claude/settings.local.json`, `.gemini/settings.json` or `.cursor/hooks.json` that runs a command |
+| WS001 | high | A hook that runs a command as soon as an agent session starts (`SessionStart`, `Setup`) in `.claude/settings.json`, `.claude/settings.local.json`, `.gemini/settings.json` or `.cursor/hooks.json` |
 | WS002 | high | A task in `.vscode/tasks.json` with `"runOn": "folderOpen"` (VS Code, Cursor, Windsurf) |
 | WS003 | medium | A local MCP server command in `.mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json`, `.roo/mcp.json` or `.gemini/settings.json` |
-| WS004 | high | A script of 500 KB or more in `scripts/`, `.claude/`, `.github/`, `.cursor/`, `.gemini/`, `.vscode/` or a root `setup.js` |
+| WS004 | high | A script of 500 KB or more in `.claude/`, `.cursor/`, `.gemini/`, `.vscode/`, or named `setup.js` / `init.js` at the root, in `scripts/` or in `.github/` |
 | WS005 | high | Invisible or text-direction characters in `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `.cursorrules`, Cursor rules or Copilot instructions |
 | WS006 | medium | An instruction file that tells the agent to act "without asking", to "hide the output" or to "run setup first" |
 | WS007 | critical | A branch head commit with a worm marker: `AutoSyncComplete:`, `msync-xxxx`, `DEVOPS-SEALED` |
-| WS008 | critical | A repository with a worm drop description: `project-utils`, `Sha1-Hulud: The Second Coming.` |
+| WS008 | critical | An exfiltration repository: description `Sha1-Hulud: The Second Coming.`, `Shai-Hulud: Here We Go Again`, or `project-utils` with a random name such as `smart-workers-48213` |
 | WS009 | medium | A default branch whose head commit, next to an autorun finding, is dated 30 days or more before the last push |
+| WS010 | medium | A hook that runs a command on another agent event (after a tool call, before a prompt...) |
+| WS011 | critical | An instruction file that carries a worm marker (`DEVOPS-SEALED`) |
 
-WS003 and WS006 can match legitimate projects; they are reported so that a human reads the file. WS009 is only
-reported together with WS001, WS002 or WS004, because worms backdate their commits to hide among old history.
+Every marker, with the public report it comes from, is in [`src/signatures.ts`](src/signatures.ts).
 
-## Real example: one stolen token, five repositories
+## Measured false positives
 
-On a public account whose token was stolen (owner notified), wormsign reported 46 findings in 5 of 12 repositories
-in about 30 seconds: four armed repositories, including a second branch (`wfx-docs`) that the owner had not cleaned, and the
-exfiltration drop created by the worm:
+<!-- BENCHMARK:START -->
+<!-- BENCHMARK:END -->
 
-```text
-[CRITICAL] WS008 <owner>/async-engines-8480@main
-  Repository looks like a worm exfiltration drop: description "project-utils".
-[CRITICAL] WS007 <owner>/async-engines-8480@main
-  Commit message carries a known worm marker: the commit was written by a worm.
-[HIGH] WS001 <owner>/amordatatrabajo@wfx-docs:.claude/settings.json
-  Agent hook runs a command when the folder is opened: "node scripts/setup.js || bun scripts/setup.js || ...".
-```
+## GitHub Action
 
-## If something is found: the order matters
-
-1. **Do not revoke the stolen token first.** The Miasma worm installs a wiper that deletes your home folder when its
-   token stops working.
-2. Disconnect the infected computer from the network and back up your files.
-3. Look for `~/.config/index.js`, `~/.local/share/runtimes/sync.py`, `~/.config/net-health-checker/` and services
-   named `pkg-runtime` or `net-health-checker`. Reinstall the computer if one exists.
-4. From a clean computer, revoke GitHub tokens, SSH keys and sessions, then npm, PyPI, cloud and AI API keys.
-5. Remove the files with a normal commit, then check your
-   [GitHub security log](https://github.com/settings/security-log) for pushes you did not make.
-
-## GitHub Action: check your organization every day
+Scan your organization every day and get a failed run, a summary and optional Security tab alerts when a worm
+appears. Available on the [GitHub Marketplace](https://github.com/marketplace/actions/wormsign-scan).
 
 ```yaml
 name: wormsign
@@ -94,43 +122,91 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      security-events: write # only for the SARIF upload
     steps:
-      - uses: nukoe-labs/wormsign@main # Pin a commit SHA in production.
+      - uses: nukoe-labs/wormsign@v1 # or pin the commit SHA of a release
         with:
           target: ${{ github.repository_owner }}
+          sarif: "true"
+      - if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: wormsign.sarif
 ```
 
-The default `github.token` reads public repositories. To include private repositories, pass a fine-grained token
-with read-only `Contents` and `Metadata` access as `token`. Set `sarif: "true"` to write `wormsign.sarif` and send it
-to the Security tab with `github/codeql-action/upload-sarif` (with `if: always()`, since the scan fails on findings).
+| Input | Default | Meaning |
+|---|---|---|
+| `target` | the repository owner | A user, an organization, or `owner/repo` |
+| `max-branches` | `20` | Branches read per repository |
+| `fail-on-findings` | `true` | Fail the job when a worm sign is found |
+| `sarif` | `false` | Write `wormsign.sarif` for `upload-sarif` |
+| `token` | `github.token` | The default token reads public repositories and the current one. To scan every private repository of an organization, pass a fine-grained token with read-only `Contents` and `Metadata` access. |
+
+| Output | Meaning |
+|---|---|
+| `findings` | The number of findings (worm signs and notes) |
+| `repositories` | The number of repositories read |
+
+The action runs the committed `dist/` folder on Node.js 24, with no `npm install` at run time.
 
 ## Library
 
 ```ts
-import { scan } from "wormsign";
+import { scan, isWormSign } from "wormsign";
 
 const { findings } = await scan("my-org", { token: process.env.GITHUB_TOKEN });
+const wormSigns = findings.filter(isWormSign);
 ```
 
-## What wormsign is not
+The library also runs in a browser (it uses `fetch`, `atob` and `TextDecoder` only).
 
-- It is not an antivirus for your computer: it reads GitHub, not your disk.
-- It does not decide that a repository is safe: a clean result means that none of the rules above matched.
-- It does not scan npm or PyPI packages; for that, see
-  [shai-hulud-detect](https://github.com/Cobenian/shai-hulud-detect). To vet a local checkout or your own agent
-  setup, see [medusa](https://github.com/Pantheon-Security/medusa) and
-  [agentshield](https://github.com/affaan-m/agentshield).
+## How it compares
+
+| Tool | What it checks | Finds a worm already pushed into your GitHub repositories |
+|---|---|---|
+| **wormsign** | Agent and editor autorun files, worm markers and exfiltration repositories in a GitHub account, on every branch, through the API | Yes, that is its only job |
+| [gitleaks](https://github.com/gitleaks/gitleaks), [TruffleHog](https://github.com/trufflesecurity/trufflehog) | Secrets committed in code and history | No: they find leaked secrets, not planted autorun files |
+| [Socket](https://socket.dev), [osv-scanner](https://github.com/google/osv-scanner) | Malicious or vulnerable packages in your dependencies | No: they look at what you install, not at what was pushed into your repositories |
+| [zizmor](https://github.com/zizmorcore/zizmor) | Insecure GitHub Actions workflows | No: it audits workflows, not agent configuration files |
+| [shai-hulud-detect](https://github.com/Cobenian/shai-hulud-detect) | A local project or computer against Shai-Hulud package indicators | Partly: it needs a local checkout and does not look at other branches or accounts |
+
+These tools are complementary. Use a package scanner to avoid the infection and wormsign to find what the worm left.
+
+## FAQ
+
+**Is a clean result a guarantee?** No. It means that none of the rules matched on the branches that were read. A
+new worm with new markers needs a new signature; see [adding a worm](docs/adding-a-worm.md).
+
+**Does it need a token?** No. Without a token GitHub allows 60 requests per hour, enough for a small account. With
+`GITHUB_TOKEN=$(gh auth token)` it allows 5,000. The token is only sent to `api.github.com`.
+
+**Can it read private repositories?** Yes, with a token that can read them. Only metadata, file trees and a few small
+configuration files are downloaded.
+
+**Why not clone and scan?** Cloning writes the worm to your disk, where an editor or agent can run it by mistake. The
+API lets you check a repository before it ever reaches your computer.
+
+**Why Node.js?** `npx` runs it everywhere without installation, the same code runs in a browser, and it has zero
+runtime dependencies to audit.
+
+**What about GitLab or Bitbucket?** Not yet. A pull request that adds another API behind the same rules is welcome.
+
+**I found a worm. What now?** Follow [the guide](docs/if-you-are-hit.md), in its order: do not revoke the stolen
+token first.
+
+## Contributing
+
+New worm variants appear every few weeks; adding one is usually one line with its public source and takes less than
+an hour: [docs/adding-a-worm.md](docs/adding-a-worm.md). Issues labeled
+[good first issue](https://github.com/nukoe-labs/wormsign/labels/good%20first%20issue) are a good start. See
+[CONTRIBUTING.md](CONTRIBUTING.md) and the [code of conduct](CODE_OF_CONDUCT.md). Report a vulnerability in wormsign
+privately, as described in [SECURITY.md](SECURITY.md).
 
 ## Sources
 
 - Bitdefender Labs, *How AI agents become new targets in a GitHub malware campaign*, November 2026.
-- SafeDep, *testmetest npm packages carry a Miasma-family worm*, updated 09/11/2026.
-- Socket, *Shai-Hulud descendant surfaces in malicious Ruby gem*, 06/11/2026.
-
-## Contributing and security
-
-See [CONTRIBUTING.md](CONTRIBUTING.md). Report a vulnerability in wormsign privately, as described in
-[SECURITY.md](SECURITY.md). New rules need a public source that shows the technique in a real attack.
+- SafeDep, *testmetest npm worm, a Miasma variant*, and *Mini Shai-Hulud strikes again*, 2026.
+- Wiz, *Shai-Hulud 2.0 ongoing supply chain attack*, November 2025.
 
 ## License
 

@@ -4,6 +4,9 @@ import type { Finding, Severity } from "./types.js";
 /** The address of the documentation of the rules. */
 export const RULES_URL = "https://github.com/nukoe-labs/wormsign#rules";
 
+/** The address of the full guide for victims. */
+export const GUIDE_URL = "https://github.com/nukoe-labs/wormsign/blob/main/docs/if-you-are-hit.md";
+
 const SARIF_LEVELS: Record<Severity, string> = { critical: "error", high: "error", medium: "warning" };
 
 /** The steps to follow, in this order, when a worm finding is confirmed. */
@@ -22,20 +25,64 @@ function formatPlace(finding: Finding): string {
   return `${finding.repository}${branch}${path}`;
 }
 
-/** Writes one finding on two lines for a terminal. */
-function formatFinding(finding: Finding): string {
-  return `[${finding.severity.toUpperCase()}] ${finding.rule} ${formatPlace(finding)}\n  ${finding.message}`;
+/** The terminal colors of each severity, as ANSI escape codes. */
+const SEVERITY_COLORS: Record<Severity, string> = { critical: "\u001B[1;31m", high: "\u001B[31m", medium: "\u001B[33m" };
+const BOLD = "\u001B[1m";
+const GREEN = "\u001B[32m";
+const RESET = "\u001B[0m";
+
+/** Wraps a text in a terminal color when colors are on. */
+function paint(text: string, color: string, useColor: boolean): string {
+  if (!useColor) {
+    return text;
+  }
+  return `${color}${text}${RESET}`;
 }
 
-/** Writes the full text report: findings first, then the response steps when something was found. */
-export function formatText(findings: Finding[], scannedRepositories: number): string {
-  const summary = `wormsign: ${findings.length} finding(s) in ${scannedRepositories} repository(ies).`;
+/** Tells whether a finding is a sign of a worm (critical or high), and not a note for a human to review. */
+export function isWormSign(finding: Finding): boolean {
+  return finding.severity !== "medium";
+}
+
+/** Counts the repositories that carry at least one worm sign. */
+export function countAffectedRepositories(findings: Finding[]): number {
+  const wormSigns = findings.filter(isWormSign);
+  const repositories = new Set(wormSigns.map(readRepository));
+  return repositories.size;
+}
+
+/** Returns the repository of a finding. */
+function readRepository(finding: Finding): string {
+  return finding.repository;
+}
+
+/** Writes the one-line summary of a scan, such as "3 of 40 repositories show worm signs". */
+export function formatSummary(findings: Finding[], scannedRepositories: number): string {
+  const affected = countAffectedRepositories(findings);
+  const notes = findings.length - findings.filter(isWormSign).length;
+  const notesText = notes === 0 ? "" : `, ${notes} note(s) to review`;
+  return `wormsign: ${affected} of ${scannedRepositories} repositories show worm signs (${findings.length} finding(s)${notesText}).`;
+}
+
+/** Writes one finding on two lines for a terminal. */
+function formatFinding(this: boolean, finding: Finding): string {
+  const label = paint(`[${finding.severity.toUpperCase()}]`, SEVERITY_COLORS[finding.severity], this);
+  return `${label} ${finding.rule} ${formatPlace(finding)}\n  ${finding.message}`;
+}
+
+/** Writes the full text report: findings first, then the summary, so that it stays visible at the bottom of a terminal, then the response steps. */
+export function formatText(findings: Finding[], scannedRepositories: number, useColor = false): string {
+  const summary = paint(formatSummary(findings, scannedRepositories), BOLD, useColor);
   if (findings.length === 0) {
-    return `${summary}\nNo sign of an agent worm was found.`;
+    return `${summary}\n${paint("No sign of an agent worm was found.", GREEN, useColor)}`;
   }
-  const lines = findings.map(formatFinding);
+  const lines = findings.map(formatFinding, useColor);
+  if (countAffectedRepositories(findings) === 0) {
+    return [...lines, "", summary, "These notes are not worm signs: read the files to confirm they are yours."].join("\n");
+  }
   const numberedSteps = RESPONSE_STEPS.map(numberStep);
-  return [summary, "", ...lines, "", "What to do, in this order:", ...numberedSteps].join("\n");
+  const guide = `Full guide: ${GUIDE_URL}`;
+  return [...lines, "", summary, "", paint("What to do, in this order:", BOLD, useColor), ...numberedSteps, guide].join("\n");
 }
 
 /** Writes one response step with its number. */
@@ -71,4 +118,33 @@ export function formatSarif(findings: Finding[], version: string): string {
   const run = { tool: { driver }, results: findings.map(describeResult) };
   const sarif = { $schema: "https://json.schemastore.org/sarif-2.1.0.json", version: "2.1.0", runs: [run] };
   return JSON.stringify(sarif, null, 2);
+}
+
+/** Protects the characters that would break a Markdown table cell. */
+function escapeTableCell(text: string): string {
+  return text.replaceAll("|", "\\|").replaceAll("\n", " ");
+}
+
+/** Writes one finding as a row of the Markdown table. */
+function formatMarkdownRow(finding: Finding): string {
+  const place = escapeTableCell(formatPlace(finding));
+  const message = escapeTableCell(finding.message);
+  return `| ${finding.severity} | ${finding.rule} | \`${place}\` | ${message} |`;
+}
+
+/** Writes the Markdown report shown in the summary of a GitHub Actions run. */
+export function formatMarkdown(findings: Finding[], scannedRepositories: number): string {
+  const title = `## ${formatSummary(findings, scannedRepositories)}`;
+  if (findings.length === 0) {
+    return `${title}\n\nNo sign of an agent worm was found.\n`;
+  }
+  const header = ["| Severity | Rule | Place | What was found |", "|---|---|---|---|"];
+  const rows = findings.map(formatMarkdownRow);
+  const numberedSteps = RESPONSE_STEPS.map(numberMarkdownStep);
+  return [title, "", ...header, ...rows, "", "### What to do, in this order", "", ...numberedSteps, ""].join("\n");
+}
+
+/** Writes one response step as an item of a Markdown numbered list. */
+function numberMarkdownStep(step: string, index: number): string {
+  return `${index + 1}. ${step}`;
 }

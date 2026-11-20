@@ -1,0 +1,21 @@
+name: False positive
+description: wormsign reported a critical or high finding on a repository that is not infected.
+labels: [false-positive]
+body:
+  - type: input
+    id: target
+    attributes:
+      label: Public repository (owner/repo)
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: wormsign output
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why the file is legitimate

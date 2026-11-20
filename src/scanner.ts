@@ -10,6 +10,7 @@ import {
   findHookCommands,
   findInjectionPhrases,
   findMcpCommands,
+  hasInstructionMarker,
   hasInvisibleCharacters,
   hasWormMarker,
   isDropDescription,
@@ -60,7 +61,9 @@ export function checkFileText(path: string, text: string, place: Place): Finding
   const filePlace = { ...place, path };
   const findings: Finding[] = [];
   if (HOOK_FILES.has(path)) {
-    findings.push(...checkCommands(RULES.agentHook, findHookCommands(text), filePlace));
+    const hookCommands = findHookCommands(text);
+    findings.push(...checkCommands(RULES.agentHook, hookCommands.sessionStart, filePlace));
+    findings.push(...checkCommands(RULES.toolHook, hookCommands.otherEvents, filePlace));
   }
   if (path === TASKS_FILE) {
     findings.push(...checkCommands(RULES.folderOpenTask, findFolderOpenTasks(text), filePlace));
@@ -88,6 +91,9 @@ function checkInstructionText(text: string, place: Place): Finding[] {
   if (hasInvisibleCharacters(text)) {
     const message = `${RULES.invisibleUnicode.title}: a human reviewer cannot see what the agent reads.`;
     findings.push(createFinding(RULES.invisibleUnicode, place, message));
+  }
+  if (hasInstructionMarker(text)) {
+    findings.push(createFinding(RULES.instructionMarker, place, `${RULES.instructionMarker.title}: the file was planted by a worm.`));
   }
   const phrases = findInjectionPhrases(text);
   if (phrases.length > 0) {
@@ -163,7 +169,7 @@ async function scanBranch(client: GitHubClient, repository: RepositoryInfo, bran
 /** Scans every branch of a repository once per head commit, at most the given number, and checks whether it is a worm drop. */
 export async function scanRepository(client: GitHubClient, repository: RepositoryInfo, maxBranches: number): Promise<Finding[]> {
   const findings: Finding[] = [];
-  if (isDropDescription(repository.description)) {
+  if (isDropDescription(repository.description, repository.name)) {
     const place = { repository: repository.full_name, branch: repository.default_branch };
     const message = `${RULES.dropRepository.title}: description "${repository.description}".`;
     findings.push(createFinding(RULES.dropRepository, place, message));

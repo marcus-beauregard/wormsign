@@ -62,4 +62,14 @@ export interface ScanOptions {
   /** The base address of the GitHub REST API. */
   apiUrl?: string;
   fetch?: FetchFunction;
+  /** Called after each answer with the requests GitHub still allows and the hourly limit. */
+  onRateLimit?: (remaining: number, limit: number) => void;
+  /** The longest wait, in seconds, for the rate limit to reset before the scan stops; 300 by default. */
+  maxWaitSeconds?: number;
+  /** The function used to wait, replaceable in tests. */
+  sleep?: (milliseconds: number) => Promise<void>;
+  /** Called before a wait for the rate limit, with the number of seconds. */
+  onWait?: (seconds: number) => void;
+  /** Called before each repository is read, with its name, its position from 1 and the total. */
+  onRepository?: (fullName: string, position: number, total: number) => void;
 }

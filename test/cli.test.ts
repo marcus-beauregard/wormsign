@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { buildScanOptions, EXIT_CLEAN, EXIT_ERROR, EXIT_FINDINGS, formatResult, isMainModule, parseArguments, run, VERSION } from "../src/cli.js";
+import { buildScanOptions, shouldUseColor, EXIT_CLEAN, EXIT_ERROR, EXIT_FINDINGS, formatResult, isMainModule, parseArguments, run, VERSION } from "../src/cli.js";
 import { formatText, RESPONSE_STEPS } from "../src/report.js";
 import type { Finding } from "../src/types.js";
 import { createFakeFetch, encodeFile, WORM_SETTINGS } from "./fake-github.js";
@@ -81,7 +81,7 @@ function writesTheThreeFormats(): void {
   expect(sarif.runs[0].tool.driver.version).toBe(VERSION);
   expect(sarif.runs[0].results[0]).toMatchObject({ ruleId: "WS001", level: "error" });
   expect(sarif.runs[0].results[1].locations[0].physicalLocation.artifactLocation.uri).toBe("victim/drop");
-  expect(formatText([], 4)).toBe("wormsign: 0 finding(s) in 4 repository(ies).\nNo sign of an agent worm was found.");
+  expect(formatText([], 4)).toBe("wormsign: 0 of 4 repositories show worm signs (0 finding(s)).\nNo sign of an agent worm was found.");
 }
 
 /** Checks that a SARIF warning is written for a medium finding. */
@@ -161,6 +161,14 @@ function restoreGlobals(): void {
   vi.restoreAllMocks();
 }
 
+/** Checks that colors are used only on a terminal and never with NO_COLOR. */
+function usesColorOnlyOnATerminal(): void {
+  expect(shouldUseColor(true, {})).toBe(true);
+  expect(shouldUseColor(true, { NO_COLOR: "" })).toBe(true);
+  expect(shouldUseColor(true, { NO_COLOR: "1" })).toBe(false);
+  expect(shouldUseColor(undefined, {})).toBe(false);
+}
+
 /** Groups the tests of the command line. */
 function describeCommandLine(): void {
   afterEach(restoreGlobals);
@@ -174,6 +182,7 @@ function describeCommandLine(): void {
   it("writes failures that are not errors", writesNonErrorFailures);
   it("recognizes the main module", recognizesTheMainModule);
   it("starts as a command", startsAsACommand);
+  it("uses color only on a terminal", usesColorOnlyOnATerminal);
 }
 
 describe("command line", describeCommandLine);

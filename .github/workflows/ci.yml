@@ -28,6 +28,8 @@ jobs:
       - run: npm run lint
       - run: npm run coverage
       - run: npm run build
+      - name: Check that the committed dist folder matches the sources
+        run: git diff --exit-code -- dist
       - name: Scan this organization with the built command
         run: node dist/cli.js nukoe-labs
         env:

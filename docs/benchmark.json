@@ -1,0 +1,38 @@
+{
+  "date": "2026-11-20T00:46:18.031Z",
+  "repositoriesPerOrganization": 20,
+  "branchesPerRepository": 3,
+  "results": [
+    {
+      "organization": "anthropics",
+      "repositories": 20,
+      "wormSigns": [],
+      "notes": 4
+    },
+    {
+      "organization": "modelcontextprotocol",
+      "repositories": 20,
+      "wormSigns": [
+        {
+          "rule": "WS001",
+          "severity": "high",
+          "repository": "modelcontextprotocol/servers",
+          "branch": "changeset-release/v2/main",
+          "commit": "58d2ae955e286818d2e22f01cd97c3d7ad12b45b",
+          "path": ".claude/settings.json",
+          "message": "Agent hook runs a command as soon as a session starts: \"node \"$CLAUDE_PROJECT_DIR/scripts/session-instructions-check.mjs\"\"."
+        },
+        {
+          "rule": "WS001",
+          "severity": "high",
+          "repository": "modelcontextprotocol/servers",
+          "branch": "main",
+          "commit": "c799c8552b0f27b7a33a7b9233773da144dddcf5",
+          "path": ".claude/settings.json",
+          "message": "Agent hook runs a command as soon as a session starts: \"node \"$CLAUDE_PROJECT_DIR/scripts/session-instructions-check.mjs\"\"."
+        }
+      ],
+      "notes": 0
+    }
+  ]
+}

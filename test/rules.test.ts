@@ -8,6 +8,7 @@ import {
   findMcpCommands,
   hasInvisibleCharacters,
   hasWormMarker,
+  hasInstructionMarker,
   isDropDescription,
   isInstructionFile,
   isLargeScript,
@@ -17,15 +18,18 @@ import { WORM_MCP, WORM_SETTINGS, WORM_TASKS } from "./fake-github.js";
 
 /** Checks that the command of a SessionStart hook is found. */
 function findsTheCommandOfASessionStartHook(): void {
-  expect(findHookCommands(WORM_SETTINGS)).toEqual(["node scripts/setup.js || bun scripts/setup.js"]);
+  expect(findHookCommands(WORM_SETTINGS)).toEqual({ sessionStart: ["node scripts/setup.js || bun scripts/setup.js"], otherEvents: [] });
+  const formatterHook = JSON.stringify({ hooks: { PostToolUse: [{ hooks: [{ type: "command", command: "npx prettier --write" }] }] } });
+  expect(findHookCommands(formatterHook)).toEqual({ sessionStart: [], otherEvents: ["npx prettier --write"] });
 }
 
 /** Checks that settings without hooks, invalid JSON and non-object JSON give no command. */
 function ignoresSettingsWithoutHooks(): void {
   const settingsWithoutHooks = JSON.stringify({ permissions: { allow: ["Bash(ls)"] } });
-  expect(findHookCommands(settingsWithoutHooks)).toEqual([]);
-  expect(findHookCommands("{ not json")).toEqual([]);
-  expect(findHookCommands("[]")).toEqual([]);
+  const noHook = { sessionStart: [], otherEvents: [] };
+  expect(findHookCommands(settingsWithoutHooks)).toEqual(noHook);
+  expect(findHookCommands("{ not json")).toEqual(noHook);
+  expect(findHookCommands("[]")).toEqual(noHook);
 }
 
 /** Checks that commands are collected at every depth and that non-string commands are skipped. */
@@ -98,10 +102,15 @@ function knowsWormMarkers(): void {
 
 /** Checks the known descriptions of drop repositories. */
 function knowsDropDescriptions(): void {
-  expect(isDropDescription("project-utils")).toBe(true);
+  expect(isDropDescription("project-utils", "async-engines-8480")).toBe(true);
+  expect(isDropDescription("project-utils", "my-project-utils")).toBe(false);
+  expect(isDropDescription("project-utils")).toBe(false);
+  expect(isDropDescription("Shai-Hulud: Here We Go Again")).toBe(true);
   expect(isDropDescription(" Sha1-Hulud: The Second Coming. ")).toBe(true);
   expect(isDropDescription("Project utilities")).toBe(false);
   expect(isDropDescription(null)).toBe(false);
+  expect(hasInstructionMarker("# DEVOPS-SEALED build notes")).toBe(true);
+  expect(hasInstructionMarker("# Build notes")).toBe(false);
 }
 
 /** Checks the count of days between a commit and the push. */

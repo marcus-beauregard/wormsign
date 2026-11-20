@@ -1,0 +1,22 @@
+name: New worm signature
+description: A worm, or a new variant, that wormsign does not find yet.
+labels: [signature]
+body:
+  - type: input
+    id: source
+    attributes:
+      label: Public source
+      description: A vendor report, an advisory or a public commit that shows the marker in a real attack.
+    validations:
+      required: true
+  - type: textarea
+    id: marker
+    attributes:
+      label: Marker
+      description: The exact text, file name or description left by the worm. Never paste a live secret or a working payload.
+    validations:
+      required: true
+  - type: input
+    id: example
+    attributes:
+      label: Public example (owner/repo), if the source names one

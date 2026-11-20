@@ -4,7 +4,7 @@ import type { Finding, RepositoryInfo, ScanOptions } from "./types.js";
 
 export { GitHubError } from "./github.js";
 export { RULES } from "./rules.js";
-export { formatJson, formatSarif, formatText, RESPONSE_STEPS } from "./report.js";
+export { countAffectedRepositories, formatJson, formatMarkdown, formatSarif, formatSummary, formatText, isWormSign, RESPONSE_STEPS } from "./report.js";
 export type { Finding, ScanOptions, Severity } from "./types.js";
 
 /** The result of a scan: the findings and how many repositories were read. */
@@ -36,7 +36,8 @@ export async function scan(target: string, options: ScanOptions = {}): Promise<S
   const maxBranches = options.maxBranches ?? DEFAULT_MAX_BRANCHES;
   const repositories = await readTargetRepositories(client, checkedTarget);
   const findings: Finding[] = [];
-  for (const repository of repositories) {
+  for (const [index, repository] of repositories.entries()) {
+    options.onRepository?.(repository.full_name, index + 1, repositories.length);
     findings.push(...(await scanRepository(client, repository, maxBranches)));
   }
   return { findings, scannedRepositories: repositories.length };
